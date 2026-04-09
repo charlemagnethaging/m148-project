@@ -13,8 +13,12 @@ format:
         - left=20mm
         - right=20mm
         - heightrounded
+    include-in-header:
+      text: |
+        \usepackage{float}
+        \floatplacement{table}{H}
     execute:
-      echo: true
+      echo: false
       warning: false
       message: false
       include: false
@@ -64,18 +68,58 @@ library(tidyverse)
 
 # Task 3 - Descriptive statistics
 
+> The following statistics were calculated using a random sample of 10% of total users in the dataset.
+
+```{r}
+#| label: load summary stat dfs
+load("data/sample_summary_stats.RData")
+```
+
 1. How long are typical journeys? Actual time and actions.
 
+```{r}
+#| include: true
 
+# have to remove underscores to render with latex
+
+clean_journey <- journey_stats |>
+	rename_with(~ str_replace_all(.x, "_", " ") |> str_to_title())
+
+if (knitr::is_html_output()) {
+	gt::gt(clean_journey)
+} else {
+	tinytable::tt(clean_journey)
+}
+```
 
 2. What are common actions? Link the action IDs with the actual action
 descriptions to answer this question.
 
+```{r}
+#| include: true
+clean_actions <- common_actions |>
+	mutate(event_name = str_replace_all(event_name, "_", " ")) |>
+	rename_with(~ str_replace_all(.x, "_", " ") |> str_to_title())
 
+if (knitr::is_html_output()) {
+	gt::gt(clean_actions)
+} else {
+	tinytable::tt(clean_actions)
+}
+```
 
 3. How much time is between an individual user’s actions?
 
+> *Time is calculated in minutes.*
 
+```{r}
+#| include: true
+clean_time_btw <- time_between_stats |>
+	rename_with(~ str_replace_all(.x, "_", " ") |> str_to_title())
 
-4. etc.
-
+if (knitr::is_html_output()) {
+	gt::gt(clean_time_btw)
+} else {
+	tinytable::tt(clean_time_btw)
+}
+```
