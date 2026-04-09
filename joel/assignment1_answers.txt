@@ -1,0 +1,38 @@
+## Task 1:
+### 1. How many rows does your data set have?
+    54960961
+### 2. How many unqiue Ids are there?
+    1391421
+### 3. What is the earliest and latest time stamp?
+    earliest: Timestamp('2020-11-03 03:31:30+0000', tz='UTC')
+    lastest: Timestamp('2023-01-23 12:29:56+0000', tz='UTC')
+
+## Task 2
+
+### 1. Duplicate Entries
+There are **3112100 duplicate entries** in the dataset, which represents **5.66%** of all rows.
+
+### 2. Dataset Size After Removing Duplicates
+After removing duplicates, the dataset contains **51848861**.
+
+## Task 3.
+
+### 1. How long are typical journeys? Actual time and actions.
+
+**78 days, and around 36-37 actions**
+
+### 2. What are common actions? Link the action IDs with the actual action descriptions to answer this question.
+
+the top 5 most commont actions are
+
+```text
+1. browse_products          id = 4.0
+2. view_cart                id = 5.0
+3. application_web_view     id = 19.0
+4. promotion_created        id = NaN
+5. add_to_cart              id = 11.0
+```
+
+### 3. How much time is between an individual user’s actions?
+
+the average gap between events in 18 days
