@@ -1,0 +1,91 @@
+---
+title: Assignment 1
+subtitle: STATS M148 FingerHut Project
+author: Charlie Kopp, Isaiah C. Mireles, Joel Yoon
+date: today
+date-format: long
+format:
+  pdf:
+    toc: false
+    number-sections: false
+    geometry:
+        - top=20mm
+        - left=20mm
+        - right=20mm
+        - heightrounded
+    execute:
+      echo: true
+      warning: false
+      message: false
+      include: false
+    fig-align: center
+    fig-height: 6
+    fig-width: 8
+---
+
+```{r}
+#| label: load packages
+#| include: false
+library(tidyverse)
+```
+
+
+# Task 0 - Fingerhut
+
+[Generated GPT](https://chatgpt.com/g/g-69cee2d550f4819195683c49639b978c-fingerhut-gpt)
+
+[Course Notes](https://docs.google.com/document/d/1k-IZ0ObDrfif1OiEVqaGXPZ5CbQxXZzn_GQ0rBYsBRE/edit?usp=sharing)
+
+# Task 1 - Read data
+
+```{r}
+#| label: load data
+data <- read_csv("C:/Users/charl/Desktop/UCLA/STATS M148/m148-project/data/dat_train1.csv")
+```
+
+```{r}
+#| label: basic summary stats
+
+nrow(data)
+data |> distinct(id) |> nrow() # num unique ids
+
+# earliest + latest timestamps
+min(data$event_timestamp)
+max(data$event_timestamp)
+```
+
+-   notice `id` feature is just **`customer_id account_id`**
+
+# Task 2 - Remove Duplicates
+
+- duplicates are when the same user logs the same action at the same time
+
+```{r}
+#| label: remove duplicates
+
+# get total count of duplicate rows
+data_unique <- data |> distinct(id, event_timestamp, event_name, .keep_all = TRUE)
+n_dupes <- nrow(data) - nrow(data_unique)
+n_dupes
+
+n_dupes / nrow(data) # proportion of total
+
+# count of clean rows
+nrow(data_unique)
+```
+
+# Task 3 - descriptive statistics (feature engineering)
+
+1. How long are typical journeys? Actual time and actions.
+2. What are common actions? Link the action IDs with the actual action
+descriptions to answer this question.
+3. How much time is between an individual user’s actions?
+4. etc.
+
+
+```{r}
+#| label: data manipulation
+
+data_wide <- data_unique |> 
+  
+```

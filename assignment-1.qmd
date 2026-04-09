@@ -1,0 +1,81 @@
+---
+title: Assignment 1
+subtitle: STATS M148 FingerHut Project
+author: Charlie Kopp, Isaiah C. Mireles, Joel Yoon
+date: today
+date-format: long
+format:
+  pdf:
+    toc: false
+    number-sections: false
+    geometry:
+        - top=20mm
+        - left=20mm
+        - right=20mm
+        - heightrounded
+    execute:
+      echo: true
+      warning: false
+      message: false
+      include: false
+    fig-align: center
+    fig-height: 6
+    fig-width: 8
+---
+
+```{r}
+#| label: load packages
+#| include: false
+library(tidyverse)
+```
+
+
+# Task 0 - Fingerhut
+
+[Generated GPT](https://chatgpt.com/g/g-69cee2d550f4819195683c49639b978c-fingerhut-gpt)
+
+[Course Notes](https://docs.google.com/document/d/1k-IZ0ObDrfif1OiEVqaGXPZ5CbQxXZzn_GQ0rBYsBRE/edit?usp=sharing)
+
+# Task 1 - Read data
+
+1. How many rows does your data set have?
+
+> 54,960,961
+
+2. How many unqiue Ids are there?
+
+> 1,430,445
+
+3. What is the earliest and latest time stamp?
+
+> Earliest: 2020-11-03 03:31:30 UTC
+
+> Latest: 2023-01-23 12:29:56 UTC
+
+# Task 2 - Remove Duplicates
+
+1. How many entries are duplicates? Total number and proportion.
+
+> Total = 3,112,100. Proportion $\approx$ 0.0566. 
+
+2. How many rows does your data set have after deleting duplicates?
+
+> 51,848,861
+
+# Task 3 - Descriptive statistics
+
+1. How long are typical journeys? Actual time and actions.
+
+
+
+2. What are common actions? Link the action IDs with the actual action
+descriptions to answer this question.
+
+
+
+3. How much time is between an individual user’s actions?
+
+
+
+4. etc.
+
