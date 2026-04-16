@@ -1,0 +1,29 @@
+## Task 1:
+### Summarize complete journeys, with a focus on how successful journeys (ending 
+### with order shipped) differ from incomplete journeys (ending with 60 days of 
+### inactivity).
+    A **complete journey** would be one where the journey ends with an order shipped. This means that no matter how long a journey takes, as long as it ends with a shipping of an order, it would be considered a successful journey. An **failed journey** would be a journey that with the cut off date in mind, at least 60 days before that cut off date the journeys did not have any activity. An **incomplete journey** would be one where the last activity was within the last 60 days that didn't end with the shipping 
+
+## Task 2:
+### Create a training data set for predictive modeling of which of the currently
+### incomplete journeys will end with a user buying something (order shipped) and
+### which will end with no item being shipped (60 days of inactivity). This is
+### actually difficult, so do some careful thinking. Please report your strategy, it’s
+### (potential) shortcomings and strengths.
+
+
+A training example should represent a journey at a point when it is still incomplete, meaning the most recent observed event is not order_shipped and fewer than 60 days have passed since the last activity. That example is labeled positive if the journey later ends with order_shipped, and negative if it later goes 60 days with no activity and never reaches order_shipped.
+
+## Task 3:
+### Use your own training data (or a subset of it) to fit a first model. My recommendation would be to fit a random forest, but I’ll leave it up to you. It does
+### not have to great, this is just a proof that you are actually able to create the
+### training data and fit a model. Please report a variable importance plot and
+### other summary statistics like OOB accuracy that are quick and easy. A GAM
+### (I would probably allow non-linear effects for main predictors) would also be a
+### good model.
+### There’s no need to create a cross-validation, hyper-parameter tuning, etc.
+### This should be just a proof of concept.
+
+OOB accuracy: 0.9737917806496242
+Training accuracy: 0.9998899474892305
+(for the graph look at my notebook, it should be at the bottom of it)
