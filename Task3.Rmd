@@ -1,0 +1,50 @@
+---
+title: "Task 3"
+author: "Charlie Kopp, Isaiah C. Mireles, Joel Yoons"
+date: "April 23, 2026"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# STATS M148 FingerHut Project
+
+# Task 1 - ICE plot and PDP plot
+
+![](images/D816FD08-AADD-41D4-9312-01577D1B5AF5_1_201_a.jpeg)
+
+Report and interpretation: the ICE plot shows that individual journeys do not all react in exactly the same way, but many of the lines move upward as `n_place_downpayment` increases. The PDP shows the average pattern more clearly, and it also goes up as downpayment activity increases. This suggests that downpayment activity is a positive signal for whether a journey will end in `order_shipped`, although the ICE plot shows that the size of the effect still depends on the rest of the journey.
+
+# Task 2 - Create training data for incomplete journeys
+
+The strategy was to use completed historical journeys as the training data and treat them as stand-ins for incomplete journeys. Positive examples are journeys that eventually end with `order_shipped`. Negative examples are journeys that do not end with `order_shipped` and instead go inactive for at least 60 days. This is simple and easy to work with, and it gives me labeled data for a first model. The main shortcoming is that these are not truly live incomplete journeys, so the setup is only an approximation. I think strong predictors are things like the number of cart events, checkout events, order attempts, downpayment events, and the last event seen in the journey.
+
+# Task 3 - fit a first predictive model for incomplete journeys
+
+[Model]{.underline} : Random Forest Model
+
+![](images/DF703557-4A4A-4AD4-A4FB-45EC9F5138E5_1_201_a.jpeg)
+
+```         
+OOB accuracy: 0.9737917806496242
+Training accuracy: 0.9998899474892305
+```
+
+# Task 4 - cross-validation for incomplete journeys
+
+Using 5-fold cross-validation, the accuracy was about `0.975`. The main thing to be careful about is leakage, since the model should only use information that would be available before the final outcome of the journey. We should expect the model to do a little worse on the real held-out test data than in cross-validation, because the truly incomplete journeys are probably more ambiguous than the historical completed journeys used for training.
+
+```         
+5-fold cross-validation accuracy: 0.9752
+```
+
+# Task 5 - create a prediction for incomplete journeys
+
+For the incomplete journeys, I used the prediction file and looked at the share of journeys predicted to be successful versus unsuccessful.
+
+```         
+Predicted successful journeys: 2.61%
+Predicted unsuccessful journeys: 97.39%
+```
+
+The model predicts that most open journeys will not end with `order_shipped`, which makes sense because many incomplete journeys never reach the strongest purchase-intent events.
