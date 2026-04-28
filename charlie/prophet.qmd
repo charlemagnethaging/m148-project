@@ -110,7 +110,6 @@ prophet_train_data <- cohort_users[, .(
 #| label: fit prophet model
 
 library(prophet)
-library(ggplot2)
 
 m <- prophet(yearly.seasonality = TRUE, weekly.seasonality=TRUE)
 m <- add_country_holidays(m, country_name = "US")
@@ -132,6 +131,9 @@ forecast <- predict(m, future_dates)
 ```{r}
 #| label: plotting
 
+library(ggplot2)
+library(dplyr)
+
 # Plot 1: The Main Forecast 
 plot(m, forecast) +
   ggtitle("FingerHut Cohort Success Rate Forecast") +
@@ -141,4 +143,39 @@ plot(m, forecast) +
 
 # Plot 2: The Components Breakdown
 prophet_plot_components(m, forecast)
+
+# plot 3: zoom in on holiday year-over-year
+
+yoy_holiday_data <- forecast %>%
+  select(ds, holidays) %>%
+  mutate(
+    # Extract the actual year to use as our color category
+    Year = as.factor(year(ds)),
+    
+    # Force every date to occur in 2024 (a leap year to protect Feb 29)
+    # This aligns 2022, 2023, and 2024 exactly on top of each other
+    dummy_date = update(ds, year = 2023)
+  )
+
+ggplot(yoy_holiday_data, aes(x = dummy_date, y = holidays, color = Year)) +
+  # Baseline zero line
+  geom_hline(yintercept = 0, color = "darkgray", linetype = "dashed") +
+  
+  # Draw the lines (alpha = 0.7 makes overlapping years easier to see through)
+  geom_line(linewidth = .5, alpha = 0.7) +
+  
+  # Add dots only on the actual holidays
+  geom_point(data = yoy_holiday_data %>% filter(holidays != 0), size = 1) +
+  
+  # Force the X-axis to label every single month using the dummy dates
+  scale_x_datetime(date_breaks = "1 month", date_labels = "%b") +
+  
+  labs(
+    title = "Year-Over-Year Holiday Effect on Cohort Quality",
+    subtitle = "Baseline success rate multiplier during US National Holidays",
+    x = "Month",
+    y = "Holiday Effect",
+    color = "Cohort Year"
+  ) +
+  theme_minimal()
 ```
