@@ -20,7 +20,7 @@ execute:
 #| label: setup
 #| include: false
 
-# install.packages(c("prophet"))
+# install.packages(c("prophet", "data.table"))
 library(data.table)
 ```
 
