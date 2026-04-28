@@ -1,0 +1,29 @@
+## Task 1:
+### Create an ICE plot and a PDP plot for (one of) the most important predictor variables in your model that predicts whether or not a journey will end successfully. Report them and interpret them.
+
+I used sklearn's `PartialDependenceDisplay` to make an ICE plot and a PDP plot for `n_place_downpayment`, since it was one of the important variables in the random forest. In the ICE plot, the individual lines are not all the same, which shows that different journeys respond differently to changes in this variable. Still, many of the lines trend upward as `n_place_downpayment` increases. In the PDP plot, the average relationship is clearer, and it also increases as `n_place_downpayment` increases. This suggests that more downpayment activity is generally a positive sign that a journey will end in `order_shipped`, although the ICE plot shows that the effect still depends on the rest of the journey history. For the plots, look at the notebook.
+
+## Task 2:
+### Create training data for incomplete journeys
+
+My strategy was to use completed historical journeys as the training set and treat them as stand-ins for incomplete journeys. Positive examples are journeys that eventually end with `order_shipped`. Negative examples are journeys that do not end with `order_shipped` and instead go inactive for at least 60 days. This is simple and easy to work with, and it gives me labeled data for a first model. The main shortcoming is that these are not truly live incomplete journeys, so the setup is only an approximation. I think strong predictors are things like the number of cart events, checkout events, order attempts, downpayment events, and the last event seen in the journey.
+
+## Task 3:
+### Fit a first predictive model for incomplete journeys
+
+I fit a random forest as my first model.
+
+OOB accuracy: 0.9737917806496242
+Training accuracy: 0.9998899474892305
+
+The variable importance plot is in the notebook.
+
+## Task 4:
+### Cross-validation for incomplete journeys
+
+Using 5-fold cross-validation, the accuracy was about 0.975. The main thing to be careful about is leakage, since the model should only use information that would be available before the final outcome of the journey. I would expect the model to do a little worse on the real held-out test data than in cross-validation, because the truly incomplete journeys are probably more ambiguous than the historical completed journeys used for training.
+
+## Task 5:
+### Create a prediction for incomplete journeys
+
+For the incomplete journeys, the model predicted about 2.61% successful journeys and 97.39% unsuccessful journeys. What I notice is that the model predicts that most open journeys will not end with `order_shipped`, which makes sense because many incomplete journeys never reach the strongest purchase-intent events.
