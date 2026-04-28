@@ -1,0 +1,41 @@
+---
+title: 'FingerHut Data Manipulation'
+author: 'Charlie Kopp'
+date: today
+date-format: long
+format:
+  html:
+    toc: true
+    code-fold: true
+    embed-resources: true
+    fig-align: center
+execute:
+  echo: true
+  warning: false
+  message: false
+
+---
+
+```{r}
+#| label: setup
+#| include: false
+library(tidyverse)
+```
+
+# Feature Engineering
+
+```{r}
+
+```
+
+# Flatten Data
+
+```{r}
+
+```
+
+# Save sample
+
+```{r}
+
+```
