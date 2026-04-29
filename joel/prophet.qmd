@@ -1,0 +1,144 @@
+---
+title: 'Prophet (time series)'
+author: 'Charlie Kopp'
+date: today
+date-format: long
+format:
+  html:
+    toc: true
+    code-fold: true
+    embed-resources: true
+    fig-align: center
+execute:
+  echo: true
+  warning: false
+  message: false
+
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+# install.packages(c("prophet", "data.table"))
+library(data.table)
+```
+
+# Data
+
+
+```{r}
+#| label: read data
+
+dt <- fread("/Users/charleskopp/Desktop/UCLA/STATS M148/m148-project/data/dat_train1.csv")
+```
+
+
+```{r}
+#| label: format data
+
+# drop incomplete rows
+
+train_cutoff_date <- as.IDate(max(dt$event_timestamp))
+
+# flatten data by user
+
+user_dt <- dt[, .(
+    first_action_date = as.IDate(min(event_timestamp)),
+    last_action_date = as.IDate(max(event_timestamp)),
+    has_shipped = any(event_name == "order_shipped"),
+    total_actions = .N
+), by = id]
+
+# define days since last action as days_inactive
+
+user_dt[, days_inactive := as.integer(train_cutoff_date - last_action_date)]
+
+user_dt[, journey_outcome := fcase(
+    has_shipped == TRUE, "success",
+    has_shipped == FALSE & days_inactive > 60, "failure",
+    default = "incomplete"
+)]
+
+table(user_dt$journey_outcome)
+
+# drop incomplete journeys
+
+user_dt_complete <- user_dt[journey_outcome != "incomplete", ]
+```
+
+
+```{r}
+#| label: find safe cohort cutoff
+
+# want to find distr. journey length for a successes and add upper end to cutoff date to reduce survivorship bias
+
+successes_only <- user_dt_complete[journey_outcome == "success"]
+
+purchase_times <- dt[event_name == "order_shipped", 
+                     .(purchase_date = as.IDate(min(event_timestamp))), 
+                     by = id]
+
+# join back to find the journey length
+journey_lengths <- merge(successes_only, purchase_times, by = "id")
+journey_lengths[, days_to_buy := as.integer(purchase_date - first_action_date)]
+
+# find the 95th percentile of how long it takes people to buy
+p95_days_success <- quantile(journey_lengths$days_to_buy, probs = 0.95, na.rm = TRUE)
+print(paste("95% of successful users buy within", round(p95_days_success), "days"))
+
+# define safe cohort start date
+# Safe Date = Cutoff - (95th Percentile Days + 60 Days Inactivity)
+safe_cutoff <- train_cutoff_date - (round(p95_days_success) + 60)
+```
+
+
+```{r}
+#| label: create cohorts
+
+cohort_users <- user_dt_complete[first_action_date <= safe_cutoff]
+
+prophet_train_data <- cohort_users[, .(
+    total_users = .N,
+    successes = sum(journey_outcome == "success"),
+    y = sum(journey_outcome == "success") / .N # Prophet requires the target to be named 'y'
+), by = .(ds = first_action_date)] # Prophet requires the date to be named 'ds'
+```
+
+
+```{r}
+#| label: fit prophet model
+
+library(prophet)
+library(ggplot2)
+
+m <- prophet(yearly.seasonality = TRUE, weekly.seasonality=TRUE)
+m <- add_country_holidays(m, country_name = "US")
+m <- fit.prophet(m, prophet_train_data)
+
+
+# alculate exactly how many days of "incomplete" cohorts we need to forecast
+days_to_forecast <- as.numeric(train_cutoff_date - safe_cutoff)
+
+# create a dataframe containing both historical dates AND future dates
+future_dates <- make_future_dataframe(m, periods = days_to_forecast)
+
+# generate the forecast
+# This creates a massive dataframe containing the prediction (yhat) and all components
+forecast <- predict(m, future_dates)
+```
+
+
+```{r}
+#| label: plotting
+
+# Plot 1: The Main Forecast 
+plot(m, forecast) +
+  ggtitle("FingerHut Cohort Success Rate Forecast") +
+  xlab("Cohort Start Date") + 
+  ylab("Baseline Success Proportion") +
+  theme_minimal()
+
+# Plot 2: The Components Breakdown
+prophet_plot_components(m, forecast)
+```
