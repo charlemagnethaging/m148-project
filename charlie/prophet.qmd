@@ -30,7 +30,7 @@ library(data.table)
 ```{r}
 #| label: read data
 
-dt <- fread("/Users/charleskopp/Desktop/UCLA/STATS M148/m148-project/data/dat_train1.csv")
+dt <- fread("C:/Users/charl/Desktop/UCLA/STATS M148/m148-project/data/dat_train1.csv")
 ```
 
 
@@ -83,9 +83,13 @@ purchase_times <- dt[event_name == "order_shipped",
 journey_lengths <- merge(successes_only, purchase_times, by = "id")
 journey_lengths[, days_to_buy := as.integer(purchase_date - first_action_date)]
 
+hist(journey_lengths$days_to_buy, breaks = 100, freq=FALSE)
+
 # find the 95th percentile of how long it takes people to buy
 p95_days_success <- quantile(journey_lengths$days_to_buy, probs = 0.95, na.rm = TRUE)
 print(paste("95% of successful users buy within", round(p95_days_success), "days"))
+
+p80_days_success <- quantile(journey_lengths$days_to_buy, probs = 0.80, na.rm = TRUE)
 
 # define safe cohort start date
 # Safe Date = Cutoff - (95th Percentile Days + 60 Days Inactivity)
@@ -116,7 +120,9 @@ m <- add_country_holidays(m, country_name = "US")
 m <- fit.prophet(m, prophet_train_data)
 
 
-# alculate exactly how many days of "incomplete" cohorts we need to forecast
+
+
+# calculate exactly how many days of "incomplete" cohorts we need to forecast
 days_to_forecast <- as.numeric(train_cutoff_date - safe_cutoff)
 
 # create a dataframe containing both historical dates AND future dates
