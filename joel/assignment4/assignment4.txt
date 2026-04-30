@@ -1,0 +1,31 @@
+## Task 1:
+### ICE, PDP, and CP profiles
+
+I used sklearn's `PartialDependenceDisplay` to make an ICE plot and a PDP plot for `n_place_downpayment`, since it was one of the most important variables in the random forest. In the ICE plot, the individual lines are not all identical, which means different journeys respond differently to changes in this variable. Still, many of the lines move upward as `n_place_downpayment` increases. In the PDP plot, the average relationship is clearer, and it also increases as `n_place_downpayment` increases. This suggests that downpayment activity is generally a strong positive signal that a journey will end in `order_shipped`, although the ICE plot shows that the size of the effect depends on the rest of the journey history.
+
+I also made CP profiles for two incomplete journeys: one with a high predicted probability of success and one with a low predicted probability of success. The high-probability journey starts from a stronger baseline, so the model still sees it as likely to succeed even when the selected variable is low. The low-probability journey stays low unless the selected feature becomes large enough to offset weaker evidence elsewhere. This is useful because the CP profiles explain individual journeys, while the PDP gives the average global pattern. The plots are in the notebook.
+
+## Task 2:
+### Kaggle submission for incomplete journeys
+
+For the Kaggle submission, I used the model's predicted probabilities instead of only submitting hard 0/1 classifications. Since the competition uses Brier score, probabilities are more informative than thresholded labels. The probability submission file has 158,325 rows, and the mean predicted success probability is about 0.0494. This means the model predicts that most incomplete journeys are unlikely to end in `order_shipped`, which makes sense because many open journeys have not reached the strongest purchase-intent events yet.
+
+The probability submission file is `assignment4_probability_submission.csv`.
+
+## Task 3:
+### Time series of number of orders shipped
+
+I computed the number of `order_shipped` events per month and used that as the monthly time series. For a first forecast of monthly shipments in 2024, I used Prophet because it handles trend and yearly seasonality directly and is easy to update as more monthly data becomes available. ARIMA or SARIMA would also be reasonable, especially if we spend more time diagnosing stationarity and autocorrelation.
+
+The notebook includes a plot of the historical monthly shipments and the Prophet forecast for 2024. In this version, the forecast only uses the historical shipment count, so it is a baseline time-series model rather than a model with external drivers.
+
+Predictor variables that could improve the forecast include promotions, marketing campaign activity, web traffic or journey starts, checkout starts, downpayment events, seasonality indicators, and calendar effects.
+
+## Task 4:
+### Dig deeper
+
+For the open-ended question, I looked at where unsuccessful journeys appear to drop out. Specifically, I looked at the last observed action for journeys that have not shipped. This helps identify which stage of the journey may need better follow-up or intervention.
+
+In the sample used in the notebook, the median non-shipped journey length was about 153.9 days, and the median number of events in non-shipped journeys was 27. The dropout plot shows the most common last observed events for non-shipped journeys. If many journeys end around browsing, cart, or checkout events, that suggests customers are dropping out before the final purchase step. If many end around application or downpayment events, then the bottleneck may be later in the purchase process.
+
+A natural next step would be to repeat this analysis on the full data and compare the terminal-event distribution for unsuccessful journeys against the events that successful journeys have right before `order_shipped`.
