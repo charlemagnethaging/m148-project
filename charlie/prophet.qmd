@@ -26,16 +26,37 @@ library(data.table)
 
 # Data
 
-
 ```{r}
 #| label: read data
 
-dt <- fread("C:/Users/charl/Desktop/UCLA/STATS M148/m148-project/data/dat_train1.csv")
+dt <- fread("STATS M148/m148-project/data/dat_train1.csv")
 ```
 
+***Thomas Feedback:***
+
+- predicting proportion of success based on first action date is too complicated. just make outcome the total orders shipped on any given day.
+- also need to figure out how prophet handles missing data (no orders are shipped on weekends)
+
+## Total orders shipped per-day approach
 
 ```{r}
 #| label: format data
+
+# just want to summarize data for total orders shipped per-day
+
+prophet_train_data <- dt[, .(
+  y = sum(event_name=="order_shipped")
+), by = .(ds = as.IDate(event_timestamp))]
+
+# drop duplicate rows
+
+
+```
+
+## First-action date p-success approach
+
+```{r}
+#| label: format data (old)
 
 # drop incomplete rows
 
@@ -65,11 +86,6 @@ table(user_dt$journey_outcome)
 # drop incomplete journeys
 
 user_dt_complete <- user_dt[journey_outcome != "incomplete", ]
-```
-
-
-```{r}
-#| label: find safe cohort cutoff
 
 # want to find distr. journey length for a successes and add upper end to cutoff date to reduce survivorship bias
 
@@ -94,11 +110,6 @@ p80_days_success <- quantile(journey_lengths$days_to_buy, probs = 0.80, na.rm = 
 # define safe cohort start date
 # Safe Date = Cutoff - (95th Percentile Days + 60 Days Inactivity)
 safe_cutoff <- train_cutoff_date - (round(p95_days_success) + 60)
-```
-
-
-```{r}
-#| label: create cohorts
 
 cohort_users <- user_dt_complete[first_action_date <= safe_cutoff]
 
@@ -109,6 +120,7 @@ prophet_train_data <- cohort_users[, .(
 ), by = .(ds = first_action_date)] # Prophet requires the date to be named 'ds'
 ```
 
+# Model fitting
 
 ```{r}
 #| label: fit prophet model
@@ -133,6 +145,7 @@ future_dates <- make_future_dataframe(m, periods = days_to_forecast)
 forecast <- predict(m, future_dates)
 ```
 
+## Interpretation
 
 ```{r}
 #| label: plotting

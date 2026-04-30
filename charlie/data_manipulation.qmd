@@ -19,19 +19,71 @@ execute:
 ```{r}
 #| label: setup
 #| include: false
-library(tidyverse)
+library(data.table)
 ```
+
+# Read Data
+
+```{r}
+#| label: read data
+
+dt <- fread("STATS M148/m148-project/data/dat_train1.csv")
+```
+
 
 # Feature Engineering
 
-```{r}
+## Prophet (time series effect) feature ?
 
-```
+
 
 # Flatten Data
 
 ```{r}
+#| label: flatten data
 
+# drop incomplete rows
+
+train_cutoff_date <- as.IDate(max(dt$event_timestamp))
+
+# flatten data by user
+
+user_dt <- dt[, .(
+    first_action_date = as.IDate(min(event_timestamp)),
+    last_action_date = as.IDate(max(event_timestamp)),
+    has_shipped = any(event_name == "order_shipped"),
+    total_actions = .N
+), by = id]
+
+# define days since last action as days_inactive
+
+user_dt[, days_inactive := as.integer(train_cutoff_date - last_action_date)]
+
+user_dt[, journey_outcome := fcase(
+    has_shipped == TRUE, "success",
+    has_shipped == FALSE & days_inactive > 60, "failure",
+    default = "incomplete"
+)]
+
+table(user_dt$journey_outcome)
+
+# drop incomplete journeys
+
+user_dt_complete <- user_dt[journey_outcome != "incomplete", ]
+
+# find distr. of successful journey length
+
+successes_only <- user_dt_complete[journey_outcome == "success"]
+
+purchase_times <- dt[event_name == "order_shipped", 
+                     .(purchase_date = as.IDate(min(event_timestamp))), 
+                     by = id]
+
+# join back to find the journey length
+journey_lengths <- merge(successes_only, purchase_times, by = "id")
+journey_lengths[, days_to_buy := as.integer(purchase_date - first_action_date)]
+
+hist(journey_lengths$days_to_buy, breaks = 100, freq=FALSE)
 ```
 
 # Save sample
