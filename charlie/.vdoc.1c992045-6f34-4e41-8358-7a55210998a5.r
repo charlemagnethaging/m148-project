@@ -1,72 +1,75 @@
----
-title: 'Prophet (time series)'
-author: 'Charlie Kopp'
-date: today
-date-format: long
-format:
-  html:
-    toc: true
-    code-fold: true
-    embed-resources: true
-    fig-align: center
-execute:
-  echo: true
-  warning: false
-  message: false
-
----
-
-```{r}
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
 #| label: setup
 #| include: false
 
 # install.packages(c("prophet", "data.table"))
 library(data.table)
-```
-
-# Data
-
-```{r}
+#
+#
+#
+#
+#
 #| label: read data
 
 dt <- fread("STATS M148/m148-project/data/dat_train1.csv")
-```
-
-***Thomas Feedback:***
-
-- predicting proportion of success based on first action date is too complicated. just make outcome the total orders shipped on any given day.
-- also need to figure out how prophet handles missing data (no orders are shipped on weekends)
-
-## Total orders shipped per-day approach
-
-```{r}
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
 #| label: format data
 
 # just want to summarize data for total orders shipped per-day
 
-prophet_train_data <- dt[, .(
-  y = sum(event_name=="order_shipped")
-), by = .(ds = as.IDate(event_timestamp))]
+prophet_train_data <- dt[,
+  .(
+    y = sum(event_name == "order_shipped")
+  ),
+  by = .(ds = as.IDate(event_timestamp))
+]
 
 # drop duplicate rows
 
-
-```
-
-## Total orders shipped per-month
-
-```{r}
+#
+#
+#
+#
+#
 #| label: monthly orders data
 
 prophet_train_data <- dt[
-  event_name == "order_shipped", 
-  .(ds = as.IDate(event_timestamp))] |>
-  _[, .(y = .N), by = .(ds = round(ds, "months"))]
-```
-
-## First-action date p-success approach
-
-```{r}
+  event_name == "order_shipped",
+  .(ds = as.IDate(event_timestamp))
+] |>
+  _[, .(y = .N), by = .(ds = ds - mday(ds) + 1)]
+#
+#
+#
+#
+#
 #| label: format data (old)
 
 # drop incomplete rows
@@ -75,22 +78,27 @@ train_cutoff_date <- as.IDate(max(dt$event_timestamp))
 
 # flatten data by user
 
-user_dt <- dt[, .(
+user_dt <- dt[,
+  .(
     first_action_date = as.IDate(min(event_timestamp)),
     last_action_date = as.IDate(max(event_timestamp)),
     has_shipped = any(event_name == "order_shipped"),
     total_actions = .N
-), by = id]
+  ),
+  by = id
+]
 
 # define days since last action as days_inactive
 
 user_dt[, days_inactive := as.integer(train_cutoff_date - last_action_date)]
 
-user_dt[, journey_outcome := fcase(
-    has_shipped == TRUE, "success",
-    has_shipped == FALSE & days_inactive > 60, "failure",
+user_dt[,
+  journey_outcome := fcase(
+    has_shipped == TRUE                       , "success" ,
+    has_shipped == FALSE & days_inactive > 60 , "failure" ,
     default = "incomplete"
-)]
+  )
+]
 
 table(user_dt$journey_outcome)
 
@@ -102,21 +110,35 @@ user_dt_complete <- user_dt[journey_outcome != "incomplete", ]
 
 successes_only <- user_dt_complete[journey_outcome == "success"]
 
-purchase_times <- dt[event_name == "order_shipped", 
-                     .(purchase_date = as.IDate(min(event_timestamp))), 
-                     by = id]
+purchase_times <- dt[
+  event_name == "order_shipped",
+  .(purchase_date = as.IDate(min(event_timestamp))),
+  by = id
+]
 
 # join back to find the journey length
 journey_lengths <- merge(successes_only, purchase_times, by = "id")
 journey_lengths[, days_to_buy := as.integer(purchase_date - first_action_date)]
 
-hist(journey_lengths$days_to_buy, breaks = 100, freq=FALSE)
+hist(journey_lengths$days_to_buy, breaks = 100, freq = FALSE)
 
 # find the 95th percentile of how long it takes people to buy
-p95_days_success <- quantile(journey_lengths$days_to_buy, probs = 0.95, na.rm = TRUE)
-print(paste("95% of successful users buy within", round(p95_days_success), "days"))
+p95_days_success <- quantile(
+  journey_lengths$days_to_buy,
+  probs = 0.95,
+  na.rm = TRUE
+)
+print(paste(
+  "95% of successful users buy within",
+  round(p95_days_success),
+  "days"
+))
 
-p80_days_success <- quantile(journey_lengths$days_to_buy, probs = 0.80, na.rm = TRUE)
+p80_days_success <- quantile(
+  journey_lengths$days_to_buy,
+  probs = 0.80,
+  na.rm = TRUE
+)
 
 # define safe cohort start date
 # Safe Date = Cutoff - (95th Percentile Days + 60 Days Inactivity)
@@ -124,50 +146,27 @@ safe_cutoff <- train_cutoff_date - (round(p95_days_success) + 60)
 
 cohort_users <- user_dt_complete[first_action_date <= safe_cutoff]
 
-prophet_train_data <- cohort_users[, .(
+prophet_train_data <- cohort_users[,
+  .(
     total_users = .N,
     successes = sum(journey_outcome == "success"),
     y = sum(journey_outcome == "success") / .N # Prophet requires the target to be named 'y'
-), by = .(ds = first_action_date)] # Prophet requires the date to be named 'ds'
-```
-
-# Model fitting
-
-## fitting to orders-per-month
-
-```{r}
-#| label: fit prophet model to monthly data
-
-library(prophet)
-
-# Initialize Prophet for monthly data
-m <- prophet(
-  yearly.seasonality = TRUE,
-  weekly.seasonality = FALSE,
-  daily.seasonality = FALSE
-)
-
-m <- fit.prophet(m, prophet_train_data)
-
-# Calculate months needed to reach Dec 2024
-last_ds <- max(prophet_train_data$ds)
-n_months <- length(seq(last_ds, as.IDate("2024-12-01"), by = "month")) - 1
-
-# Create future dataframe at monthly frequency
-future_monthly <- make_future_dataframe(m, periods = max(0, n_months), freq = "month")
-forecast_monthly <- predict(m, future_monthly)
-```
-
-## fitting to cohort method
-
-```{r}
+  ),
+  by = .(ds = first_action_date)
+] # Prophet requires the date to be named 'ds'
+#
+#
+#
+#
+#
 #| label: fit prophet model
 
 library(prophet)
 
-m <- prophet(yearly.seasonality = TRUE, weekly.seasonality=TRUE)
+m <- prophet(yearly.seasonality = TRUE, weekly.seasonality = TRUE)
 m <- add_country_holidays(m, country_name = "US")
 m <- fit.prophet(m, prophet_train_data)
+
 
 # calculate exactly how many days of "incomplete" cohorts we need to forecast
 days_to_forecast <- as.numeric(train_cutoff_date - safe_cutoff)
@@ -178,25 +177,20 @@ future_dates <- make_future_dataframe(m, periods = days_to_forecast)
 # generate the forecast
 # This creates a massive dataframe containing the prediction (yhat) and all components
 forecast <- predict(m, future_dates)
-```
-
-## Interpretation
-
-```{r}
+#
+#
+#
+#
+#
 #| label: plotting
 
 library(ggplot2)
 library(dplyr)
 
-# Visualize monthly forecast
-plot(m, forecast_monthly) +
-  labs(title = "Monthly Orders Forecast through 2024", x = "Month", y = "Orders Shipped") +
-  theme_minimal()
-
-# Plot 1: The Main Forecast 
+# Plot 1: The Main Forecast
 plot(m, forecast) +
   ggtitle("FingerHut Cohort Success Rate Forecast") +
-  xlab("Cohort Start Date") + 
+  xlab("Cohort Start Date") +
   ylab("Baseline Success Proportion") +
   theme_minimal()
 
@@ -210,7 +204,7 @@ yoy_holiday_data <- forecast %>%
   mutate(
     # Extract the actual year to use as our color category
     Year = as.factor(year(ds)),
-    
+
     # Force every date to occur in 2024 (a leap year to protect Feb 29)
     # This aligns 2022, 2023, and 2024 exactly on top of each other
     dummy_date = update(ds, year = 2023)
@@ -219,16 +213,16 @@ yoy_holiday_data <- forecast %>%
 ggplot(yoy_holiday_data, aes(x = dummy_date, y = holidays, color = Year)) +
   # Baseline zero line
   geom_hline(yintercept = 0, color = "darkgray", linetype = "dashed") +
-  
+
   # Draw the lines (alpha = 0.7 makes overlapping years easier to see through)
   geom_line(linewidth = .5, alpha = 0.7) +
-  
+
   # Add dots only on the actual holidays
   geom_point(data = yoy_holiday_data %>% filter(holidays != 0), size = 1) +
-  
+
   # Force the X-axis to label every single month using the dummy dates
   scale_x_datetime(date_breaks = "1 month", date_labels = "%b") +
-  
+
   labs(
     title = "Year-Over-Year Holiday Effect on Cohort Quality",
     subtitle = "Baseline success rate multiplier during US National Holidays",
@@ -237,4 +231,6 @@ ggplot(yoy_holiday_data, aes(x = dummy_date, y = holidays, color = Year)) +
     color = "Cohort Year"
   ) +
   theme_minimal()
-```
+#
+#
+#

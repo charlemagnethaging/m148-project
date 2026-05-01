@@ -1,0 +1,75 @@
+---
+title: 'Assignment 4'
+subtitle: 'Stats M148 FingerHut Project'
+author: 'Charlie Kopp, Isaiah C. Mireles, Joel Yoon'
+date: today
+date-format: long
+format:
+  pdf:
+    toc: false
+    number-sections: false
+    fig-align: center
+    geometry:
+        - top=20mm
+        - left=20mm
+        - right=20mm
+        - heightrounded
+
+execute:
+  echo: true
+  warning: false
+  message: false
+
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+```
+
+# Task 1 - ICE and PDP plots
+
+For the ICE plot, PDP plot, and CP profiles, we used `n_place_downpayment` when available because it was one of the more important variables in the random forest from the previous assignment. If that variable is not available in the sampled training data, the code automatically uses the most important variable from the fitted model.
+
+![ICE Plot]("joel/assignment4/assignment4_ice_plot.png"){width=70%}
+
+![PDP Plot]("joel/assignment4/assignment4_pdp_plot.png"){width=70%}
+
+**Interpretation:** The ICE plot shows how the prediction changes for individual journeys when only the selected variable is changed. The PDP averages those individual curves into one overall relationship. If the PDP rises as n_place_downpayment increases, then downpayment activity is a positive signal for eventual shipment. The ICE plot is still important because it shows whether that effect is consistent across journeys or whether it depends strongly on the other journey features.
+
+{{< pagebreak >}}
+
+## CP profiles
+
+The CP profiles below choose one incomplete journey with a high predicted probability of success and one with a low predicted probability of success. For each journey, we hold all other features fixed and vary the selected variable. This gives a local explanation for those specific journeys instead of the average explanation from the PDP.
+
+![CP Profiles]("joel/assignment4/assignment4_cp_profiles.png"){width=70%}
+
+**Interpretation:** The high-probability incomplete journey starts from a stronger baseline, so even when the selected feature is set to low values, the model still sees other signals that make success plausible. The low-probability journey stays low unless the selected feature becomes large enough to offset weaker evidence elsewhere. This is the main difference between CP profiles and the PDP: the PDP gives a global average pattern, while the CP profiles explain individual journeys.
+
+{{< pagebreak >}}
+
+# Task 2 - kaggle submission
+
+- we submitted!
+
+# Task 3 - time-series of # orders shipped
+
+For a first forecast of monthly shipments in 2024, we used Prophet because it handles trend and yearly seasonality directly and is easy to update as more monthly data arrives. ARIMA/SARIMA would also be reasonable, especially if we spend more time diagnosing stationarity and autocorrelation.
+
+![Order Count forecast plot (Prophet)]("charlie/monthly_order_forecast.png"){width=70%}
+
+*Notes:* Additional regressors that could improve the forecast include dates for promotions, marketing campaign activity, web traffic or journey starts, checkout starts, downpayment events, seasonality indicators, and macro calendar effects. In this Prophet model we used only the historical shipment count, so the forecast is a baseline time-series model rather than a causal or driver-based forecast. We also should restrict the model to a strictly positive scale (using log-transform?).
+
+In terms of usage in our journey prediction model, this forecast isn't particularly helpful since we have to predict incomplete journeys restricted to a < 60 day period, so adding a constant order frequency column (for the given ~ two month window of incomplete users we are testing) wouldn't give the model any meaningful information. If we restructured our forecast to predict a much shorter time frame (i.e. given certain activity, how many orders shipped 'tomorrow') or saw a significant daily effect, that could potentially be useful.
+
+{{< pagebreak >}}
+
+# Task 4 - digging deeper...
+
+We looked more closely at where unsuccessful journeys appear to drop out. The question is: what is a common last observed action for journeys that have not shipped? This is useful because it shows which stage of the journey may need better follow-up or intervention.
+
+![Dropouts plot]("joel/assignment4/assignment4_dropout_events.png"){width=70%}
+
+This bar chart shows the distribution of last observed events for unsuccessful journeys. If many journeys end around browsing, cart, or checkout events, that suggests customers are dropping out before the final purchase step. If many end around application or downpayment events, then the bottleneck may be later in the purchase process. A next step would be to repeat this on the full data and compare the terminal-event distribution against successful journeys right before order_shipped.
