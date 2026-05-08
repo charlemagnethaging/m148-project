@@ -21,6 +21,8 @@ execute:
 #| label: setup
 #| include: false
 library(data.table)
+library(collapse)
+library(arrow)
 ```
 
 # Read Data
@@ -28,8 +30,8 @@ library(data.table)
 ```{r}
 #| label: read data
 
-dt <- readRDS("data/dt_clean.rds")
-user_outcomes <- readRDS("data/user_outcomes.rds")
+dt <- setDT(read_parquet("data/dt_clean.parquet"))
+user_outcomes <- setDT(read_parquet("data/user_outcomes.parquet"))
 ```
 
 # Separate Complete and Incomplete (test and train) Users
@@ -46,68 +48,66 @@ train_ids <- user_outcomes[final_outcome != "incomplete", id]
 ```{r}
 #| label: flatten function
 flatten_journey <- function(events_dt) {
-  # 1. Grouped Feature Engineering
-  summary_dt <- events_dt[
-    order(id, event_timestamp),
-    {
-      first_ts <- event_timestamp[1]
-      last_ts <- event_timestamp[.N]
-      user_cutoff <- cutoff_time[1]
+	setorder(events_dt, id, event_timestamp)
 
-      if (.N > 1) {
-        diffs <- as.numeric(difftime(
-          event_timestamp,
-          shift(event_timestamp),
-          units = "secs"
-        ))
-        mean_gap <- mean(diffs, na.rm = TRUE)
-        med_gap <- median(diffs, na.rm = TRUE)
-        max_g <- max(diffs, na.rm = TRUE)
-      } else {
-        mean_gap <- NA_real_
-        med_gap <- NA_real_
-        max_g <- NA_real_
-      }
+	# OPTIMIZATION 2: Create temporary integer columns for fast math.
+	# This leaves original event_timestamp completely untouched for later use
+	events_dt[, ts_int := as.integer(event_timestamp)]
+	events_dt[, cutoff_int := as.integer(cutoff_time)]
 
-      .(
-        first_action_ts = first_ts,
-        last_action_ts = last_ts,
-        journey_length_s = as.integer(difftime(
-          last_ts,
-          first_ts,
-          units = "secs"
-        )),
-        days_inactive = as.integer(difftime(
-          user_cutoff,
-          last_ts,
-          units = "days"
-        )),
-        total_actions = .N,
-        mean_gap_sec = mean_gap,
-        median_gap_sec = med_gap,
-        max_gap_sec = max_g,
-        last_ed_id = ed_id[.N] # Very strong predictor
-      )
-    },
-    by = id
-  ]
+	# OPTIMIZATION 3: Vectorize the gaps globally.
+	# Calculating shift() inside a grouped block is slow. Doing it here is near-instant.
+	events_dt[, gap_s := ts_int - shift(ts_int), by = id]
 
-  # 2. Wide Event Counts
-  counts <- dcast(
-    events_dt,
-    id ~ event_name,
-    value.var = "event_name",
-    fun.aggregate = length,
-    fill = 0
-  )
-  setnames(
-    counts,
-    setdiff(names(counts), "id"),
-    paste0("n_", setdiff(names(counts), "id"))
-  )
+	# 1. Grouped Feature Engineering
+	summary_dt <- events_dt[,
+		{
+			first_ts <- event_timestamp[1]
+			last_ts <- event_timestamp[.N]
 
-  # 3. Merge and return
-  return(merge(summary_dt, counts, by = "id"))
+			first_ts_int <- ts_int[1]
+			last_ts_int <- ts_int[.N]
+			user_cutoff_int <- cutoff_int[1]
+
+			.(
+				first_action_ts = first_ts,
+				last_action_ts = last_ts,
+
+				# MATH HACK 1: Seconds length is just max minus min
+				journey_length_s = last_ts_int - first_ts_int,
+
+				# MATH HACK 2: Days is just the seconds difference divided by 86,400
+				days_inactive = as.integer((user_cutoff_int - last_ts_int) / 86400),
+
+				total_actions = .N,
+
+				mean_gap_sec = if (.N > 1) mean(gap_s, na.rm = TRUE) else NA_real_,
+				median_gap_sec = if (.N > 1) fmedian(gap_s, na.rm = TRUE) else NA_real_,
+				max_gap_sec = if (.N > 1) max(gap_s, na.rm = TRUE) else NA_integer_
+			)
+		},
+		by = id
+	]
+
+  # CLEANUP: Remove the temporary math columns
+  events_dt[, c("ts_int", "cutoff_int", "gap_s") := NULL]
+
+	# 2. Wide Event Counts
+	counts <- dcast(
+		events_dt,
+		id ~ event_name,
+		value.var = "event_name",
+		fun.aggregate = length,
+		fill = 0
+	)
+	setnames(
+		counts,
+		setdiff(names(counts), "id"),
+		paste0("n_", setdiff(names(counts), "id"))
+	)
+
+	# 3. Merge and return
+	return(merge(summary_dt, counts, by = "id"))
 }
 ```
 
@@ -121,7 +121,7 @@ test_events[, cutoff_time := max(event_timestamp)]
 test_flat <- flatten_journey(test_events)
 test_flat[, final_outcome := "incomplete"]
 
-saveRDS(test_flat, "data/test_features.rds")
+write_parquet(test_flat, "data/test_features.parquet")
 
 rm(test_events, test_flat); gc()
 ```
@@ -182,8 +182,6 @@ rm(train_events, train_events_truncated, train_flat, cutoffs); gc()
 
 ## 2. Sample proportional to total_actions
 
-### generate K cutoffs per user based on total_actions
-
 
 ```{r}
 #| label: generate K cutoffs
@@ -217,7 +215,8 @@ cutoffs[, random_cutoff := start_ts + runif(.N) * as.numeric(difftime(end_ts, st
 cutoffs[, snapshot_id := paste0(id, "_", rowid(id))]
 ```
 
-### generate K cutoffs per user based on journey_days
+## 3. Sample proportional to journey_days
+
 
 ```{r}
 #| label: generate K cutoffs per user based on journey_days
@@ -299,7 +298,7 @@ train_flat <- merge(train_flat,
 rm(train_events_expanded); gc()
 
 # save k-cutoff sample
-saveRDS(train_flat, "data/train_features_kcut_sample.rds")
+write_parquet(train_flat, "data/train_features_kcut_sample.parquet")
 
 rm(list=ls()); gc()
 ```
