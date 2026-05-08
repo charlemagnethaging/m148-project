@@ -20,6 +20,7 @@ execute:
 #| label: setup
 #| include: false
 library(data.table)
+library(arrow)
 ```
 
 # Read Data
@@ -46,6 +47,8 @@ sum(duplicated(dt, by=c("id", "event_timestamp", "event_name", "journey_steps_un
 
 # ensure temporal order
 setorder(dt, id, event_timestamp)
+
+idx_duped <- duplicated(dt, by=c("id", "event_timestamp", "event_name"), fromLast = TRUE)
 
 # 1. Create a reference table of the duplicate keys
 dupe_keys <- dt[idx_duped, .(id, event_timestamp, event_name)]
@@ -101,10 +104,12 @@ user_outcomes[,
 user_outcomes[,
   final_outcome := fcase(
     has_shipped == TRUE , "success" ,
-    days_inactive > 60  , "failure" ,
+    days_inactive >= 60  , "failure" ,
     default = "incomplete"
   )
 ]
+
+table(user_outcomes$final_outcome)
 
 # Keep only the essential mapping
 user_outcomes <- user_outcomes[, .(id, final_outcome)]
@@ -115,8 +120,8 @@ user_outcomes <- user_outcomes[, .(id, final_outcome)]
 ```{r}
 #| label: save data
 
-saveRDS(dt, "data/dt_clean.rds")
-saveRDS(user_outcomes, "data/user_outcomes.rds")
+write_parquet(dt, 'data/dt_clean.parquet')
+write_parquet(user_outcomes, "data/user_outcomes.parquet")
 
-rm(dt, user_outcomes); gc()
+rm(list=ls()); gc()
 ```
