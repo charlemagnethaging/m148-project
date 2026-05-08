@@ -182,9 +182,11 @@ rm(train_events, train_events_truncated, train_flat, cutoffs); gc()
 
 ## 2. Sample proportional to total_actions
 
+### generate K cutoffs per user based on total_actions
+
 
 ```{r}
-#| label: proportional sample
+#| label: generate K cutoffs
 
 train_events <- dt[id %in% train_ids]
 
@@ -196,6 +198,8 @@ snapshot_counts <- train_events[, .(
   start_ts      = event_timestamp[1],
   end_ts        = event_timestamp[.N]
 ), by = id]
+
+snapshot_counts <- merge(snapshot_counts, user_outcomes[, .(id, final_outcome)], by = "id")
 
 # 2. Define K: bounded between 1 and 5
 
@@ -211,4 +215,91 @@ cutoffs[, random_cutoff := start_ts + runif(.N) * as.numeric(difftime(end_ts, st
 
 # Create a unique ID for each snapshot (e.g., "User123_1", "User123_2")
 cutoffs[, snapshot_id := paste0(id, "_", rowid(id))]
+```
+
+### generate K cutoffs per user based on journey_days
+
+```{r}
+#| label: generate K cutoffs per user based on journey_days
+
+train_events <- dt[id %in% train_ids]
+
+set.seed(13)
+
+# 1. Summarize user journeys to determine K
+snapshot_counts <- train_events[, .(
+  total_actions = .N,
+  start_ts      = event_timestamp[1],
+  end_ts        = event_timestamp[.N]
+), by = id][
+  , journey_days := as.numeric(
+    difftime(end_ts, start_ts, units="days"))]
+
+snapshot_counts <- merge(snapshot_counts, user_outcomes[, .(id, final_outcome)], by = "id")
+
+# 2. Define K: bounded between 1 and 5
+
+# frank(..., ties.method = "min") safely handles the heavy skew
+# It ranks users 1 to N, divides by N to get a percentile (0 to 1), multiplies by 5, and rounds up.
+snapshot_counts[, K := ceiling(5 * (frank(journey_days, ties.method = "min") / .N))]
+
+# 3. Expand the table: Duplicate rows so each user has K rows
+cutoffs <- snapshot_counts[rep(1:.N, K)]
+
+# 4. Generate random cutoffs and a unique snapshot_id
+cutoffs[, random_cutoff := start_ts + runif(.N) * as.numeric(difftime(end_ts, start_ts, units="secs"))]
+
+# Create a unique ID for each snapshot (e.g., "User123_1", "User123_2")
+cutoffs[, snapshot_id := paste0(id, "_", rowid(id))]
+```
+
+### join K cutoffs back to train_events
+
+```{r}
+#| label: join K cutoffs back to train_events
+
+# Duplicate the timestamp so it survives the join
+train_events[, event_ts_dup := event_timestamp]
+
+# Perform the Time Machine Join: Only keep events BEFORE the random cutoff
+train_events_expanded <- train_events[cutoffs[, .(id, snapshot_id, random_cutoff)], 
+                                      on = .(id, event_ts_dup <= random_cutoff), 
+                                      nomatch = NULL, 
+                                      allow.cartesian = TRUE]
+
+# Cleanup column names post-join
+setnames(train_events_expanded, "event_ts_dup", "cutoff_time") # The join condition column holds the cutoff timestamp
+
+# Rename snapshot_id to 'id' so your function treats each snapshot as a unique user
+setnames(train_events_expanded, "id", "original_user_id")
+setnames(train_events_expanded, "snapshot_id", "id")
+
+
+# Free up memory before flattening
+rm(train_events, cutoffs, snapshot_counts); gc()
+
+
+# Execute the flattening (This might take a few minutes depending on CPU)
+train_flat <- flatten_journey(train_events_expanded)
+
+
+
+# Rename 'id' back to 'snapshot_id' for clarity
+setnames(train_flat, "id", "snapshot_id")
+
+# extract the original ID out of the snapshot string
+train_flat[, id := sub("_[0-9]+$", "", snapshot_id)]
+
+# Add the final labels back to the flattened training data
+train_flat <- merge(train_flat, 
+                    user_outcomes[id %in% train_ids, .(id, final_outcome)], 
+                    by = "id")
+
+# Free up the expanded raw events
+rm(train_events_expanded); gc()
+
+# save k-cutoff sample
+saveRDS(train_flat, "data/train_features_kcut_sample.rds")
+
+rm(list=ls()); gc()
 ```
