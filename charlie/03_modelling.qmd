@@ -128,7 +128,14 @@ lrn_rf <- lrn(
 	num.trees = 500
 )
 
-lrn_xgb <- lrn("classif.xgboost", id = "xgboost_tuned", predict_type = "prob", nthread = 1)
+lrn_xgb <- lrn(
+	"classif.xgboost",
+	id = "xgboost_tuned",
+	predict_type = "prob",
+	nthread = 8,
+	booster = 'gbtree',
+	tree_method = 'hist'
+)
 
 search_space <- ps(
 	nrounds = p_int(lower = 50, upper = 300),
@@ -137,31 +144,37 @@ search_space <- ps(
 )
 
 at_xgb <- auto_tuner(
-  tuner = tnr("random_search", batch_size = 10),
-  learner = lrn_xgb,
-  resampling = rsmp("holdout"), 
-  measure = msr("classif.bbrier"),
-  search_space = search_space,
-  term_evals = 15 # 15 combinations is "light" but effective
+	tuner = tnr("random_search", batch_size = 10),
+	learner = lrn_xgb,
+	resampling = rsmp("holdout"),
+	measure = msr("classif.bbrier"),
+	search_space = search_space,
+	term_evals = 15 # 15 combinations is "light" but effective
 )
 
 # Standard Random Forest
-lrn_rf_base <- lrn("classif.ranger", 
-                   id = "RF_Baseline", 
-                   predict_type = "prob", 
-                   importance = "impurity",
-                   num.trees=100,
-                   max.depth=15,
-                   num.threads = 8)
+lrn_rf_base <- lrn(
+	"classif.ranger",
+	id = "RF_Baseline",
+	predict_type = "prob",
+	importance = "impurity",
+	num.trees = 100,
+	max.depth = 15,
+	num.threads = 8
+)
 
 # Standard XGBoost (No tuning)
-lrn_xgb_base <- lrn("classif.xgboost", 
-                    id = "XGB_Baseline", 
-                    predict_type = "prob",
-                    nrounds = 100, 
-                    eta = 0.1, 
-                    max_depth = 6,
-                    nthread=8)
+lrn_xgb_base <- lrn(
+	"classif.xgboost",
+	id = "XGB_Baseline",
+	predict_type = "prob",
+	nrounds = 100,
+	eta = 0.1,
+	max_depth = 6,
+	booster = 'gbtree',
+	tree_method = 'hist',
+	nthread = 8
+)
 ```
 
 ## base models
@@ -200,17 +213,40 @@ options(future.globals.maxSize = 2 * 1024^3)
 
 rsmp_cv5$instantiate(tsk_train)
 
-rr_rf <- resample(tsk_train, lrn_rf_base, rsmp_cv5)
+# rr_rf <- resample(tsk_train, lrn_rf_base, rsmp_cv5)
 rr_xgb <- resample(tsk_train, lrn_xgb_base, rsmp_cv5)
+rr_xgb$aggregate(measures)
 
+# TUNING WATCH OUT
 
+# rr_xgb_tuned <- resample(
+#   task = tsk_dev, 
+#   learner = at_xgb, 
+#   resampling = rsmp("cv", folds = 5) # Your standard grouped CV
+# )
 
-design <- benchmark_grid(
-  tasks = tsk_train,
-  learners = list(lrn_rf, at_xgb),
-  resamplings = rsmp("cv", folds = 5)
+# rr_xgb_tuned$aggregate(measures)
+
+at_xgb$train(tsk_train)
+print(at_xgb$tuning_result)
+
+preds <- at_xgb$predict_newdata(test_flat)
+
+submission <- data.table(
+  id = test_flat$id,
+  order_shipped = preds$prob[, "success"]
 )
 
-# Execute the benchmark
-bmr <- benchmark(design)
+fwrite(submission, "charlie/submissions/sub1_xgb_tuned_full.csv")
+
+# WAY too big for bmr...
+
+# design <- benchmark_grid(
+#   tasks = tsk_train,
+#   learners = list(lrn_rf, at_xgb),
+#   resamplings = rsmp("cv", folds = 5)
+# )
+
+# # Execute the benchmark
+# bmr <- benchmark(design)
 ```
