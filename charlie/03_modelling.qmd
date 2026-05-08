@@ -237,7 +237,7 @@ submission <- data.table(
   order_shipped = preds$prob[, "success"]
 )
 
-fwrite(submission, "charlie/submissions/sub1_xgb_tuned_full.csv")
+fwrite(submission, "charlie/submissions/sub2_xgb_tuned_full.csv")
 
 # WAY too big for bmr...
 
