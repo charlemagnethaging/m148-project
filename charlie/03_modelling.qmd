@@ -20,6 +20,7 @@ execute:
 #| label: setup
 #| include: false
 library(data.table)
+library(arrow)
 library(mlr3)
 library(mlr3tuning)
 library(mlr3learners)
@@ -32,8 +33,8 @@ library(future)
 ```{r}
 #| label: load data
 # ed_defs <- fread('data/Event Definitions.csv')
-train_flat <- readRDS("data/train_features_kcut_sample.rds")
-test_flat <- readRDS("data/test_features.rds")
+train_flat <- setDT(read_parquet("data/train_features_kcut_sample.parquet"))
+test_flat <- setDT(read_parquet("data/test_features.parquet"))
 
 train_flat[, final_outcome := factor(final_outcome, levels = c("success", "failure"))]
 test_flat[, final_outcome := factor(final_outcome, levels = c("success", "failure"))]
@@ -94,7 +95,6 @@ tsk_train$set_col_roles("snapshot_id", roles = "name")
 leakers <- c(
   'first_action_ts',
   'last_action_ts',
-  'last_ed_id',
   'n_order_shipped',
   'n_place_order_web',
   "n_place_order_phone",
@@ -187,7 +187,7 @@ submission <- data.table(
   order_shipped = preds$prob[, "success"]
 )
 
-fwrite(submission, "data/sub1_xgb_dev.csv")
+fwrite(submission, "charlie/submissions/sub1_xgb_dev.csv")
 ```
 
 ## tuning + bm
