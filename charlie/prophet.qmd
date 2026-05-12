@@ -22,6 +22,7 @@ execute:
 
 # install.packages(c("prophet", "data.table"))
 library(data.table)
+library(arrow)
 ```
 
 # Data
@@ -29,13 +30,21 @@ library(data.table)
 ```{r}
 #| label: read data
 
-dt <- fread("STATS M148/m148-project/data/dat_train1.csv")
+dt <- read_parquet('data/dt_clean.parquet')
+user_outcomes <- read_parquet('data/user_outcomes.parquet')
 ```
 
 ***Thomas Feedback:***
 
 - predicting proportion of success based on first action date is too complicated. just make outcome the total orders shipped on any given day.
 - also need to figure out how prophet handles missing data (no orders are shipped on weekends)
+
+There's a few **issues**:
+
+- the first couple months have no orders_shipped: ongoing journeys weren't included in dataset. for accurate time series need to figure out start point where most journeys that were ongoing would have wrapped up. 
+  - solution: take 80th pctl of successful journey length
+
+- there should be no data on weekends (warehouse closed = no order_shipped). but there are actually low counts on some weekends, missing on others
 
 ## Total orders shipped per-day approach
 
@@ -48,20 +57,83 @@ prophet_train_data <- dt[, .(
   y = sum(event_name=="order_shipped")
 ), by = .(ds = as.IDate(event_timestamp))]
 
-# drop duplicate rows
+new_start_date <- min(prophet_train_data$ds) + 71 # = 80th pctl of j-length, found below
 
-
+prophet_train_data <- prophet_train_data[ds > new_start_date]
+setorder(prophet_train_data, ds)
 ```
 
-## Total orders shipped per-month
+### Find start date where ongoing orders would have shipped by then
+
+- 80th percentile of successful journey length = 71 days
+
+```{r}
+# label: figure out start cutoff
+
+# 1. solve start cutoff issue
+
+success_id <- user_outcomes[final_outcome == "success", id]
+
+success_lengths <- dt[id %in% success_id,{
+  first_date <- as.IDate(event_timestamp[1])
+	last_date <- as.IDate(event_timestamp[.N])
+  .(
+    journey_length_days = as.integer(last_date - first_date, units='days')
+  )
+}, by=id]
+
+hist(success_lengths$journey_length_days, breaks = 100, freq=FALSE)
+
+# find the 95th percentile of how long it takes people to buy
+quantile(success_lengths$journey_length_days, probs = 0.95, na.rm = TRUE) # 95th pctile = 221 days
+quantile(success_lengths$journey_length_days, probs = 0.80, na.rm = TRUE) # 80th pctile = 71 days
+
+new_start_date <- min(prophet_train_data$ds) + 71
+
+prophet_train_data <- prophet_train_data[ds > new_start_date]
+```
+
+### deal with weekend entries
+
+```{r}
+# label: fix weekend counts
+
+weekend_dat <- prophet_train_data[weekdays(ds) == "Saturday" | weekdays(ds) == "Sunday"]
+
+plot(weekend_dat$ds, weekend_dat$y)
+
+setorder(weekend_dat, -y) |> head(20)
+
+summary.default(weekend_dat$y)
+
+# easy solution: drop weekends
+
+daily_train_data <- prophet_train_data[!(ds %in% weekend_dat$ds)]
+```
+
+Most of the weekend data is low (~ 56), but some are high (mostly in later months).
+
+## Total orders shipped per-WEEK
+
+```{r}
+#| label: weekly data
+
+weekly_train_data <- prophet_train_data[,
+  .(y = sum(y)),
+  by = .(ds = round(ds, "weeks"))
+]
+```
+
+## Total orders shipped per-MONTH
+
 
 ```{r}
 #| label: monthly orders data
 
-prophet_train_data <- dt[
-  event_name == "order_shipped", 
-  .(ds = as.IDate(event_timestamp))] |>
-  _[, .(y = .N), by = .(ds = round(ds, "months"))]
+monthly_train_data <- prophet_train_data[, .(y = sum(y)), by = .(ds = round(ds, "months"))]
+
+# cut incomplete first and last months
+monthly_train_data <- monthly_train_data[ds > "2021-01-01" & ds < "2023-01-01"]
 ```
 
 ## First-action date p-success approach
@@ -133,12 +205,72 @@ prophet_train_data <- cohort_users[, .(
 
 # Model fitting
 
-## fitting to orders-per-month
+```{r}
+#| label: load prophet package
 
+library(prophet)
+```
+
+## fit orders-per-DAY model
+
+```{r}
+#| label: fit prophet model to daily data
+
+# sort data by time
+setorder(daily_train_data, ds)
+
+# Initialize Prophet for daily data
+m <- prophet(
+  yearly.seasonality = TRUE,
+  weekly.seasonality = TRUE,
+  daily.seasonality = FALSE
+)
+
+m <- add_country_holidays(m, country_name = "US")
+
+m <- fit.prophet(m, daily_train_data)
+
+# Calculate DAYS needed to reach Dec 2024
+last_ds <- max(daily_train_data$ds)
+n_days <- length(seq(last_ds, as.IDate("2024-12-01"), by = "day")) - 1
+
+# Create future dataframe at daily frequency
+future_daily <- make_future_dataframe(m, periods = max(0, n_days), freq = "day")
+forecast_daily <- predict(m, future_daily)
+```
+
+## fit orders-per-WEEK model
+
+```{r}
+#| label: prophet weekly model
+
+# sort data by time
+setorder(weekly_train_data, ds)
+
+# Initialize Prophet for weekly data
+m <- prophet(
+  yearly.seasonality = TRUE,
+  weekly.seasonality = FALSE,
+  daily.seasonality = FALSE
+)
+
+m <- fit.prophet(m, weekly_train_data)
+
+# Calculate WEEKS needed to reach Dec 2024
+last_ds <- max(weekly_train_data$ds)
+n_weeks <- length(seq(last_ds, as.IDate("2024-12-01"), by = "week")) - 1
+
+# Create future dataframe at daily frequency
+future_weekly <- make_future_dataframe(m, periods = max(0, n_weeks), freq = "week")
+forecast_weekly <- predict(m, future_weekly)
+```
+
+## fitting to orders-per-MONTH
 ```{r}
 #| label: fit prophet model to monthly data
 
-library(prophet)
+# sort data by time
+setorder(monthly_train_data, ds)
 
 # Initialize Prophet for monthly data
 m <- prophet(
@@ -147,13 +279,13 @@ m <- prophet(
   daily.seasonality = FALSE
 )
 
-m <- fit.prophet(m, prophet_train_data)
+m <- fit.prophet(m, monthly_train_data)
 
-# Calculate months needed to reach Dec 2024
-last_ds <- max(prophet_train_data$ds)
+# Calculate MONTHS needed to reach Dec 2024
+last_ds <- max(monthly_train_data$ds)
 n_months <- length(seq(last_ds, as.IDate("2024-12-01"), by = "month")) - 1
 
-# Create future dataframe at monthly frequency
+# Create future dataframe at MONTHLY frequency
 future_monthly <- make_future_dataframe(m, periods = max(0, n_months), freq = "month")
 forecast_monthly <- predict(m, future_monthly)
 ```
@@ -162,8 +294,6 @@ forecast_monthly <- predict(m, future_monthly)
 
 ```{r}
 #| label: fit prophet model
-
-library(prophet)
 
 m <- prophet(yearly.seasonality = TRUE, weekly.seasonality=TRUE)
 m <- add_country_holidays(m, country_name = "US")
@@ -180,32 +310,72 @@ future_dates <- make_future_dataframe(m, periods = days_to_forecast)
 forecast <- predict(m, future_dates)
 ```
 
-## Interpretation
+# Interpretation
 
 ```{r}
-#| label: plotting
+#| label: load viz packages
 
 library(ggplot2)
 library(dplyr)
+```
+
+## Daily orders shipped 
+
+```{r}
+#| label: plot daily model
+
+# plot(prophet_train_data$ds, prophet_train_data$y, cex=0.5)
+
+# sum(weekdays(prophet_train_data$ds) %in% c("Saturday", "Sunday"))
+
+# setorder(prophet_train_data, y) |> head(20)
+
+plot(m, forecast_daily) +
+  labs(title = "Daily Orders Forecast through 2024", x = "Date", y = "Orders Shipped") +
+  theme_minimal()
+
+ggsave("charlie/prophet-plots/daily_forecast.png", width=8, height=4)
+
+# Plot 2: The Components Breakdown
+prophet_plot_components(m, forecast_daily)
+
+# ggsave("charlie/prophet-plots/daily_components.png", width=8, height=6)
+```
+
+## Weekly orders shipped
+
+```{r}
+#| label: plot weekly model
+
+plot(m, forecast_weekly) +
+  labs(title = "Daily Orders Forecast through 2024", x = "Date", y = "Orders Shipped") +
+  theme_minimal()
+
+ggsave("charlie/prophet-plots/weekly_forecast.png", width=8, height=4)
+
+# Plot 2: The Components Breakdown
+prophet_plot_components(m, forecast_weekly)
+```
+
+## Monthly orders shipped 
+
+```{r}
+#| label: plot monthly model
+
 
 # Visualize monthly forecast
 plot(m, forecast_monthly) +
   labs(title = "Monthly Orders Forecast through 2024", x = "Month", y = "Orders Shipped") +
   theme_minimal()
 
-# Plot 1: The Main Forecast 
-plot(m, forecast) +
-  ggtitle("FingerHut Cohort Success Rate Forecast") +
-  xlab("Cohort Start Date") + 
-  ylab("Baseline Success Proportion") +
-  theme_minimal()
+ggsave("charlie/prophet-plots/monthly_forecast.png", width = 8, height=4)
 
 # Plot 2: The Components Breakdown
-prophet_plot_components(m, forecast)
+prophet_plot_components(m, forecast_monthly)
 
 # plot 3: zoom in on holiday year-over-year
 
-yoy_holiday_data <- forecast %>%
+yoy_holiday_data <- forecast_daily %>%
   select(ds, holidays) %>%
   mutate(
     # Extract the actual year to use as our color category

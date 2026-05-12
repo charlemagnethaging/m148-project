@@ -50,12 +50,12 @@ train_ids <- user_outcomes[final_outcome != "incomplete", id]
 flatten_journey <- function(events_dt) {
 	setorder(events_dt, id, event_timestamp)
 
-	# OPTIMIZATION 2: Create temporary integer columns for fast math.
+	# OPTIMIZATION: Create temporary integer columns for fast math.
 	# This leaves original event_timestamp completely untouched for later use
 	events_dt[, ts_int := as.integer(event_timestamp)]
 	events_dt[, cutoff_int := as.integer(cutoff_time)]
 
-	# OPTIMIZATION 3: Vectorize the gaps globally.
+	# OPTIMIZATION: Vectorize the gaps globally.
 	# Calculating shift() inside a grouped block is slow. Doing it here is near-instant.
 	events_dt[, gap_s := ts_int - shift(ts_int), by = id]
 
