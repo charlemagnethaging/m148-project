@@ -1,8 +1,5 @@
-# OG Datasets
-dat_train1.csv
-dat_train2.csv
-
-# Big intermed. files
+# Big data files
+*.csv
 *.parquet
 *.rds
 *.RData
