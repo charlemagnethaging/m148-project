@@ -1,0 +1,64 @@
+---
+title: 'Assignment 6'
+subtitle: 'Stats M148'
+author: 'Isaiah C. Mireles, Charlie Kopp, Joel Yoon'
+date: today
+date-format: long
+format:
+  pdf:
+    toc: false
+    number-sections: false
+    fig-align: center
+    geometry:
+        - top=20mm
+        - left=20mm
+        - right=20mm
+        - heightrounded
+
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+```
+
+# Task 1 - time series analysis
+
+> Tell me about the model you are using for your data set, why did you chose it? What coeﬀicients are you including and why? Plot or tabulate the coeﬀicients and interpret them. Create a forecast for 2024 and submit a plot of the predictions. The predictive accuracy of your forecast will not be graded (yet). Are there any predictor variables you could use?
+
+We chose the Prophet model for our time series analysis because of the interpretability of its components (trend, seasonality, holidays) and its ability to handle missing data and outliers. 
+
+For the monthly model, we just included the trend $g(t)$ and yearly seasonality $s(t)$ components as monthly data does not have the granularity for holidays or weekly seasonality. The components are plotted below: 
+
+![Monthly model components](monthly_components.png)
+
+And here are the predictions for 2024:
+
+![Monthly model predictions](monthly_predictions.png)
+
+For the daily model, we included the trend $g(t)$, yearly seasonality $s(t)$, weekly seasonality $w(t)$, and US holidays as components. The components are plotted below: 
+
+![Daily model components](daily_components.png)
+
+And here are the predictions for 2024:
+
+![Daily model predictions](daily_predictions.png)
+
+# Task 2 - predictive modeling reflection
+
+With our late submission, we were able to do pretty well (2nd place) with the first test set competition, albeit with very little tweaking or optimization. One thing to note is that our best predictions came from an XGBoost model trained on a random 10% sample of the data (vs. a model trained on full train set). Hyperparameter tuning did very little to improve performance. A couple ideas I have to improve are as follows:
+
+- Better-informed feature selection (e.g. using LASSO regression or RF feature importance)
+- Comparing simpler baseline models (LASSO, logistic regression) to more complex ones (random forest, XGBoost) to see if the added complexity is justified
+- More extensive feature engineering: more info on time btw. actions (currently only max, median and mean), indicators for specific action sequences, getting external information on promotions
+- Fitting a neural network (RNN, LSTM, or transformer) to capture signal in the sequential nature of the data
+
+# Task 3 - dig deeper cont.
+
+- How would we approach fitting a RNN/LSTM/transformer to this data? How would we handle the varying lengths btw actions?
+- 
