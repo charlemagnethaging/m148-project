@@ -1,5 +1,12 @@
-# Original Dataset
+# OG Datasets
 dat_train1.csv
+dat_train2.csv
+
+# Big intermed. files
+*.parquet
+*.rds
+*.RData
+
 
 # History files
 .Rhistory
