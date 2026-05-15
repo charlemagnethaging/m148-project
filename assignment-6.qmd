@@ -35,19 +35,19 @@ We chose the Prophet model for our time series analysis because of the interpret
 
 For the monthly model, we just included the trend $g(t)$ and yearly seasonality $s(t)$ components as monthly data does not have the granularity for holidays or weekly seasonality. The components are plotted below: 
 
-![Monthly model components](monthly_components.png)
+![Monthly model components](charlie/prophet-plots/monthly_components.png){height=40%}
 
 And here are the predictions for 2024:
 
-![Monthly model predictions](monthly_predictions.png)
+![Monthly model predictions](charlie/prophet-plots/monthly_forecast.png){height=40%}
 
 For the daily model, we included the trend $g(t)$, yearly seasonality $s(t)$, weekly seasonality $w(t)$, and US holidays as components. The components are plotted below: 
 
-![Daily model components](daily_components.png)
+![Daily model components](charlie/prophet-plots/daily_components.png){height=40%}
 
 And here are the predictions for 2024:
 
-![Daily model predictions](daily_predictions.png)
+![Daily model predictions](charlie/prophet-plots/daily_forecast.png){height=40%}
 
 # Task 2 - predictive modeling reflection
 

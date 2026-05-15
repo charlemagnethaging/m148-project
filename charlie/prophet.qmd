@@ -269,25 +269,39 @@ forecast_weekly <- predict(m, future_weekly)
 ```{r}
 #| label: fit prophet model to monthly data
 
-# sort data by time
-setorder(monthly_train_data, ds)
+# 1. bind target to prevent negative predictions
+monthly_train_data <- monthly_train_data %>%
+  mutate(
+    cap = max(y) * 1.5, # Set a reasonable upper bound for the target
+    floor = 0
+  )
 
-# Initialize Prophet for monthly data
-m <- prophet(
-  yearly.seasonality = TRUE,
-  weekly.seasonality = FALSE,
-  daily.seasonality = FALSE
+# 2. Initialize the model with DEFAULT yearly seasonality turned OFF
+m_monthly <- prophet(
+  growth = 'logistic',   # Turn on bounded growth
+  yearly.seasonality = FALSE, 
+  weekly.seasonality = FALSE, 
+  daily.seasonality = FALSE,
+  changepoint.prior.scale = 0.01 # Makes the trend line much stiffer
 )
 
-m <- fit.prophet(m, monthly_train_data)
+# 3. Manually add a "gentle" yearly seasonality
+# Setting fourier.order to 2 or 3 forces a smooth, gentle seasonal wave
+# rather than the jagged, over-fitted 10-order default.
+m_monthly <- add_seasonality(m_monthly, name = 'yearly', period = 365.25, fourier.order = 2)
 
-# Calculate MONTHS needed to reach Dec 2024
-last_ds <- max(monthly_train_data$ds)
-n_months <- length(seq(last_ds, as.IDate("2024-12-01"), by = "month")) - 1
+# 4. Fit the model
+m_monthly <- fit.prophet(m_monthly, monthly_train_data)
 
-# Create future dataframe at MONTHLY frequency
-future_monthly <- make_future_dataframe(m, periods = max(0, n_months), freq = "month")
-forecast_monthly <- predict(m, future_monthly)
+# 5. Predict
+future_monthly <- make_future_dataframe(m_monthly, periods = 24, freq = 'month')
+future_monthly <- future_monthly %>%
+  mutate(
+    cap = max(monthly_train_data$y) * 1.5, # Use the same cap for future data
+    floor = 0
+  )
+forecast_monthly <- predict(m_monthly, future_monthly)
+
 ```
 
 ## fitting to cohort method
@@ -310,13 +324,14 @@ future_dates <- make_future_dataframe(m, periods = days_to_forecast)
 forecast <- predict(m, future_dates)
 ```
 
-# Interpretation
+# Interpretation / Visualization
 
 ```{r}
 #| label: load viz packages
 
 library(ggplot2)
 library(dplyr)
+library(patchwork)
 ```
 
 ## Daily orders shipped 
@@ -337,9 +352,11 @@ plot(m, forecast_daily) +
 ggsave("charlie/prophet-plots/daily_forecast.png", width=8, height=4)
 
 # Plot 2: The Components Breakdown
-prophet_plot_components(m, forecast_daily)
+comp_plots <- prophet_plot_components(m, forecast_daily)
 
-# ggsave("charlie/prophet-plots/daily_components.png", width=8, height=6)
+wrap_plots(comp_plots, ncol=1)
+
+ggsave("charlie/prophet-plots/daily_components.png", width=8, height=6)
 ```
 
 ## Weekly orders shipped
@@ -364,15 +381,18 @@ prophet_plot_components(m, forecast_weekly)
 
 
 # Visualize monthly forecast
-plot(m, forecast_monthly) +
+plot(m_monthly, forecast_monthly) +
   labs(title = "Monthly Orders Forecast through 2024", x = "Month", y = "Orders Shipped") +
   theme_minimal()
 
 ggsave("charlie/prophet-plots/monthly_forecast.png", width = 8, height=4)
 
 # Plot 2: The Components Breakdown
-prophet_plot_components(m, forecast_monthly)
+comp_plots <- prophet_plot_components(m_monthly, forecast_monthly)
 
+wrap_plots(comp_plots, ncol=1)
+
+ggsave("charlie/prophet-plots/monthly_components.png", width=8, height=6)
 # plot 3: zoom in on holiday year-over-year
 
 yoy_holiday_data <- forecast_daily %>%
