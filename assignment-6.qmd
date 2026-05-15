@@ -60,5 +60,8 @@ With our late submission, we were able to do pretty well (2nd place) with the fi
 
 # Task 3 - dig deeper cont.
 
-- How would we approach fitting a RNN/LSTM/transformer to this data? How would we handle the varying lengths btw actions?
-- 
+We could fit an RNN, LSTM, GRU, or transformer by treating each customer journey as an ordered sequence of actions. Each action would be one step in the sequence and could include the event type, funnel stage, time since the previous action, and cumulative counts of important actions up to that point.
+
+The main issue is that journeys have different lengths. Some customers may only have a few events, while others may have hundreds. To handle this, we could choose a maximum sequence length, truncate longer journeys to the most recent actions, and pad shorter journeys. We would also use masking so the model ignores padded values.
+
+We would also include time between actions directly, since the same sequence may mean different things depending on whether it happened over minutes or months. A transformed feature like log1p(time_since_previous_action) would help account for skewed time gaps.- 
