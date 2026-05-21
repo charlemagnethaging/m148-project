@@ -1,0 +1,85 @@
+## Task 1:
+### Time series of number of orders shipped
+
+I used monthly aggregation for the number of `order_shipped` events. I kept monthly aggregation because daily aggregation has a weekend issue: the warehouse is mostly closed on weekends, but the data still contains some weekend shipment counts. Monthly aggregation smooths out that operational artifact and gives a cleaner series for a 2024 forecast.
+
+For the model, I used a seasonal Poisson regression with a log link. The response variable is the monthly count of orders shipped. The predictors are a linear month trend plus annual and semiannual sine/cosine terms. This makes the model interpretable because the trend coefficient captures the overall direction of shipments, while the Fourier terms capture seasonality.
+
+The trend coefficient was about -0.044, meaning each additional month multiplies the expected shipment count by about 0.957 after adjusting for seasonality. In other words, the fitted trend is decreasing by about 4.3% per month. The seasonality terms suggest higher expected shipment counts around the beginning/end of the year and weaker counts around mid-year.
+
+For 2024, the model predicted about 37,681 total orders shipped, with an approximate 95% confidence interval from 17,753 to 81,608. The monthly predicted means were:
+
+- Jan 2024: 4,679
+- Feb 2024: 3,406
+- Mar 2024: 3,063
+- Apr 2024: 3,312
+- May 2024: 3,449
+- Jun 2024: 2,924
+- Jul 2024: 2,178
+- Aug 2024: 1,843
+- Sep 2024: 2,116
+- Oct 2024: 3,006
+- Nov 2024: 3,934
+- Dec 2024: 3,771
+
+The forecast plot and coefficient table are in the notebook.
+
+## Task 2:
+### Improve predictive performance of the incomplete journey model
+
+The main thing I would improve is the way the training data is created. In the previous model, completed historical journeys were used as stand-ins for incomplete journeys. That is a reasonable first approximation, but it can make the training examples look too different from real open journeys.
+
+A better strategy is to sample multiple point-in-time snapshots from completed journeys. Each snapshot should only include information available up to that time. The label would be positive if the journey later ends in `order_shipped` and negative if the journey later goes inactive for at least 60 days without shipping. I would also sample cut points so that the training set matches the test set more closely in journey age, number of actions, and time since last action.
+
+Additional predictors I would compute include:
+
+- Time since last action
+- Time since first action
+- Number of actions in the last 1, 7, and 30 days
+- Time since last checkout, order, or downpayment event
+- Deepest funnel stage reached
+- Last event and last funnel stage
+- Recent event sequences or n-grams
+- Repeated application attempts
+- Repeated cart/checkout loops
+- Promotion counts and campaign click counts
+
+I would keep the random forest as a baseline, but I would compare it with gradient boosting and regularized logistic regression. Since the Kaggle score is based on probabilities, I would also check calibration using Brier score and reliability curves.
+
+## Task 3:
+### Plot predicted probability over time
+
+I created a probability timeline plot using the reference plots as a template. The x-axis is time since the start of the journey in days, and the y-axis is the model's predicted probability that the journey will eventually end in `order_shipped`. The gray step line is the model prediction after each observed action.
+
+I used one failed journey with 396 observed events. The plot includes all actions in the journey. The event markers follow the reference style:
+
+- Purple triangles: `promotion_created`
+- Green/gray circles: `browse_products`
+- Orange squares: `view_cart`
+- Black hexagons: all other events
+
+The random forest used for this plot was trained on a 750,000-row sample using the same point-in-time training strategy as the earlier assignments. Its OOB accuracy was about 0.978.
+
+This failed journey never becomes very likely to ship. The maximum predicted probability is only about 0.209, and the probability trends back down over time as the journey continues without reaching deeper purchase milestones like downpayment or account activation. I also included a zoomed-in plot for the first 20 days because that is where much of the dense early activity happens.
+
+The probability timeline plots are in the notebook.
+
+## Task 4:
+### Dig deeper continued
+
+I continued looking at where non-shipped journeys appear to drop out. Using the same 750,000-row sample as the probability timeline, the median non-shipped journey lasted about 248 days and had 25 observed events.
+
+The most common last observed events among non-shipped journeys were:
+
+- `promotion_created`: 7,035 journeys
+- `catalog_(mail)`: 2,511 journeys
+- `browse_products`: 1,520 journeys
+- `campaignemail_clicked`: 636 journeys
+- `view_cart`: 439 journeys
+- `application_web_approved`: 323 journeys
+- `begin_checkout`: 319 journeys
+- `campaign_click`: 304 journeys
+
+One issue is that a last observed event is not always a customer decision. For example, `promotion_created` and `catalog_(mail)` may be company-initiated marketing touches rather than active customer behavior. So these terminal events may indicate that FingerHut kept marketing to the customer, not necessarily that the customer actively dropped out at that exact point.
+
+A better next step would be to separate user-initiated terminal events from company-initiated terminal events. Still, the preliminary result is consistent with the earlier work: many non-shipped journeys stop before deep purchase milestones, while journeys that reach downpayment or account activation are much more likely to ship.
