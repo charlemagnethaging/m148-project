@@ -63,23 +63,3 @@ The random forest used for this plot was trained on a 750,000-row sample using t
 This failed journey never becomes very likely to ship. The maximum predicted probability is only about 0.209, and the probability trends back down over time as the journey continues without reaching deeper purchase milestones like downpayment or account activation. I also included a zoomed-in plot for the first 20 days because that is where much of the dense early activity happens.
 
 The probability timeline plots are in the notebook.
-
-## Task 4:
-### Dig deeper continued
-
-I continued looking at where non-shipped journeys appear to drop out. Using the same 750,000-row sample as the probability timeline, the median non-shipped journey lasted about 248 days and had 25 observed events.
-
-The most common last observed events among non-shipped journeys were:
-
-- `promotion_created`: 7,035 journeys
-- `catalog_(mail)`: 2,511 journeys
-- `browse_products`: 1,520 journeys
-- `campaignemail_clicked`: 636 journeys
-- `view_cart`: 439 journeys
-- `application_web_approved`: 323 journeys
-- `begin_checkout`: 319 journeys
-- `campaign_click`: 304 journeys
-
-One issue is that a last observed event is not always a customer decision. For example, `promotion_created` and `catalog_(mail)` may be company-initiated marketing touches rather than active customer behavior. So these terminal events may indicate that FingerHut kept marketing to the customer, not necessarily that the customer actively dropped out at that exact point.
-
-A better next step would be to separate user-initiated terminal events from company-initiated terminal events. Still, the preliminary result is consistent with the earlier work: many non-shipped journeys stop before deep purchase milestones, while journeys that reach downpayment or account activation are much more likely to ship.
