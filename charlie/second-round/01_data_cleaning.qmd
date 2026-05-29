@@ -28,7 +28,7 @@ library(arrow)
 ```{r}
 #| label: read data
 
-dt <- fread("data/dat_train1.csv")
+dt <- fread("data/dat_train2.csv")
 ```
 
 # Init. inspection and clean
@@ -120,8 +120,8 @@ user_outcomes <- user_outcomes[, .(id, final_outcome)]
 ```{r}
 #| label: save data
 
-write_parquet(dt, 'data/dt_clean.parquet')
-write_parquet(user_outcomes, "data/user_outcomes.parquet")
+write_parquet(dt, 'data/dt_clean2.parquet')
+write_parquet(user_outcomes, "data/user_outcomes2.parquet")
 
 rm(list=ls()); gc()
 ```

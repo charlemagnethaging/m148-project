@@ -28,7 +28,7 @@ library(arrow)
 ```{r}
 #| label: read data
 
-dt <- fread("data/dat_train2.csv")
+dt <- fread("data/dat_train1.csv")
 ```
 
 # Init. inspection and clean

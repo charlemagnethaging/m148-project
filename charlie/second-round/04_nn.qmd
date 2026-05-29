@@ -1,0 +1,26 @@
+---
+title: 'RNN / Sequential Processing'
+subtitle: 'Stats M148 FingerHut Project - Second Round'
+author: 'Charlie Kopp'
+date: today
+date-format: long
+format:
+  html:
+    toc: true
+    code-fold: true
+    embed-resources: true
+    fig-align: center
+execute:
+  echo: true
+  warning: false
+  message: false
+
+---
+
+```{r}
+#| label: setup
+#| include: false
+library(arrow)
+library(data.table)
+
+```

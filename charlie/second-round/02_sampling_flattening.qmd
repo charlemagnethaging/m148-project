@@ -30,8 +30,8 @@ library(arrow)
 ```{r}
 #| label: read data
 
-dt <- setDT(read_parquet("data/dt_clean.parquet"))
-user_outcomes <- setDT(read_parquet("data/user_outcomes.parquet"))
+dt <- setDT(read_parquet("data/dt_clean2.parquet"))
+user_outcomes <- setDT(read_parquet("data/user_outcomes2.parquet"))
 ```
 
 # Separate Complete and Incomplete (test and train) Users
