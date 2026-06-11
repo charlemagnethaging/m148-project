@@ -35,7 +35,17 @@ have a lot of nice and large figures, you can go over. -->
 
 *context and backround info. cite any external sources*
 
+- definition of diff journey statuses
+
+
 # Exploratory Data Analysis
+
+## Plots:
+
+- table of journeys (successful, unsuccessful, incomplete)
+- distribution of journey durations split by end result
+- 
+
 
 # Task 1: Predictive Modeling of Ongoing Journeys
 
@@ -43,6 +53,9 @@ have a lot of nice and large figures, you can go over. -->
 – cutting strategy for completed journeys (if needed for your model)
 – modeling approach. Discussion of strengths and weaknesses of the model, possible improvements.
 – at least 2 visualizations of your model, more is better
+
+- discuss data leakage (cut off journeys before they have actions that spoil the result, i.e. payment_placed)
+- make CP + ice plot for most important features
 
 # Task 2: Forecasting Number of Orders Shipped
 
@@ -52,11 +65,20 @@ have a lot of nice and large figures, you can go over. -->
 are
 – at least 2 visualizations of your model, more is better
 
+- can reuse prophet plots
+- need to calculate accuracy by comparing forecast of model trained on dat_train1 to the new data in dat_train2
+
 # Sidequest: LSTM?
 
+- briefly discuss process and package used, pretty much just copy off slides
 *at least one more section on something you did in the ”branching out” category*
 
 # Appendix
 
-- Contributions of each team member
-- Contributions of AI
+## Contributions of each team member
+
+- **Charlie:** data cleaning, EDA, XGB tuning + fitting, prophet forecasting, LSTM
+- **Isaiah:** data cleaning, EDA, XGB tuning + fitting, prophet forecasting
+- **Joel:** data cleaning, EDA, XGB tuning + fitting, prophet forecasting
+
+**Contributions of AI:** brainstorming, learning NN package for fitting LSTM, ...
