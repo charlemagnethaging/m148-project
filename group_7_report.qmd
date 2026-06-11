@@ -49,13 +49,54 @@ have a lot of nice and large figures, you can go over. -->
 
 # Task 1: Predictive Modeling of Ongoing Journeys
 
-- task description
-– cutting strategy for completed journeys (if needed for your model)
-– modeling approach. Discussion of strengths and weaknesses of the model, possible improvements.
-– at least 2 visualizations of your model, more is better
+We modeled whether an ongoing customer journey would eventually end in an
+`order_shipped` event. To make completed journeys resemble the ongoing journeys
+seen at prediction time, we cut each completed journey at sampled intermediate
+points and calculated features using only the actions visible before each cut.
+We used an XGBoost classifier because its boosted trees can represent nonlinear
+effects and interactions among event counts, journey timing, and the customer's
+most recent activity.
 
-- discuss data leakage (cut off journeys before they have actions that spoil the result, i.e. payment_placed)
-- make CP + ice plot for most important features
+To limit data leakage, features that directly reveal the outcome or occur very
+late in the purchase process were excluded. These included `n_order_shipped`,
+order-placement counts, downpayment counts, and the original action timestamps.
+We also downsampled successful journeys in training to better reflect their
+lower prevalence among ongoing journeys. XGBoost performed well and handled the
+large, sparse feature set, although its predictions are less directly
+interpretable than those from a regression model and may be sensitive to
+changes in customer behavior over time.
+
+## XGBoost Model Interpretation
+
+![Gain-based importance for the leading XGBoost features. Importance identifies
+features used heavily by the model, but does not show the direction of their
+effects.](figures/xgb_feature_importance.png){width=75%}
+
+The number of unique event types observed in a journey was the most important
+non-leaky feature, so we examined it using individual conditional expectation
+(ICE) and ceteris paribus (CP) profiles. Both methods vary this feature while
+holding all other journey features fixed.
+
+![ICE profiles for 100 journeys. Each blue line represents one journey and the
+red line is their average.](figures/xgb_ice_plot.png){width=78%}
+
+The ICE profiles show a nonlinear effect: predicted shipment probabilities are
+generally low for journeys with fewer than about ten unique event types, then
+rise as journeys include a broader range of actions. The large spread among the
+blue curves shows that event variety is not sufficient by itself; the effect
+depends strongly on the journey's other events and timing features.
+
+![CP profiles for one higher-probability and one lower-probability journey. The
+outlined points mark each journey's observed value.](figures/xgb_cp_profiles.png){width=78%}
+
+The CP profiles provide local explanations for two specific journeys. Increasing
+event variety sharply raises the higher-probability journey's prediction, while
+the lower-probability journey remains relatively unlikely to ship even at high
+values. This difference illustrates the interactions captured by XGBoost:
+otherwise favorable journey signals must also be present for event variety to
+translate into a high predicted probability. These profiles describe model
+behavior rather than a causal effect, and some hypothetical feature
+combinations may not occur naturally.
 
 # Task 2: Forecasting Number of Orders Shipped
 
