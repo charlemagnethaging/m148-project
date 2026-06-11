@@ -33,9 +33,34 @@ have a lot of nice and large figures, you can go over. -->
 
 # Introduction
 
-*context and backround info. cite any external sources*
+Fingerhut is an online retailer whose shopping experience combines product
+discovery and purchasing with credit-account activity; WebBank identifies
+Fingerhut's Fetti Credit Account and FreshStart installment loan as its lending
+products.[^fingerhut-credit] This creates customer journeys that can include
+marketing interactions, credit applications, browsing, checkout, downpayment,
+account-management, and shipment events. Understanding how customers move
+through this funnel can help identify active customers who are likely to
+complete a purchase and support planning for future shipment volume.
 
-- definition of diff journey statuses
+Our data contain 51,848,861 deduplicated events from 1,430,445 customer
+journeys recorded between November 3, 2020 and January 23, 2023. We define a
+journey as all observed events associated with one anonymized ID and classify
+its status at the end of the observation period as follows:
+
+- **Successful:** the journey contains an `order_shipped` event.
+- **Unsuccessful:** the journey contains no `order_shipped` event and has been
+  inactive for at least 60 days.
+- **Ongoing (incomplete):** the journey contains no `order_shipped` event, but
+  its most recent activity occurred within the final 60 days, so its outcome is
+  not yet known.
+
+This report first explores how activity and timing differ across these journey
+statuses. It then addresses two related prediction problems: estimating the
+probability that each ongoing journey will eventually produce a shipment, and
+forecasting the aggregate number of orders shipped over time. Together, these
+tasks connect customer-level conversion behavior with operational demand.
+
+[^fingerhut-credit]: WebBank, ["Brand Partners"](https://www.webbank.com/brand-partners).
 
 
 # Exploratory Data Analysis
