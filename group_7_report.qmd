@@ -1,0 +1,62 @@
+---
+title: 'Group 7 Final Report'
+subtitle: 'Stats M148 FingerHut Project'
+author: 'Charlie Kopp, Isaiah Mireles, Joel Yoon'
+date: today
+date-format: long
+format:
+  pdf:
+    toc: true
+    number-sections: true
+    fig-align: center
+    geometry:
+        - top=20mm
+        - left=20mm
+        - right=20mm
+        - heightrounded
+
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: setup
+#| include: false
+library(tidyverse)
+```
+
+<!-- Try your best to include lots of high quality visualizations and not too much
+text. Shorter is better, please keep your report below 5 pages if you can. If you
+have a lot of nice and large figures, you can go over. -->
+
+# Introduction
+
+*context and backround info. cite any external sources*
+
+# Exploratory Data Analysis
+
+# Task 1: Predictive Modeling of Ongoing Journeys
+
+- task description
+– cutting strategy for completed journeys (if needed for your model)
+– modeling approach. Discussion of strengths and weaknesses of the model, possible improvements.
+– at least 2 visualizations of your model, more is better
+
+# Task 2: Forecasting Number of Orders Shipped
+
+– task description
+– modeling approach. Discussion of strengths and weaknesses of the model, possible improvements.
+– actual forecasts including a quantification of how good your forecasts
+are
+– at least 2 visualizations of your model, more is better
+
+# Sidequest: LSTM?
+
+*at least one more section on something you did in the ”branching out” category*
+
+# Appendix
+
+- Contributions of each team member
+- Contributions of AI
