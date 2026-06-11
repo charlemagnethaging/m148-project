@@ -170,4 +170,4 @@ would be needed for the sequence model to improve predictive accuracy.
 - **Isaiah:** data cleaning, EDA, XGB tuning + fitting, prophet forecasting
 - **Joel:** data cleaning, EDA, XGB tuning + fitting, prophet forecasting
 
-**Contributions of AI:** brainstorming, learning NN package for fitting LSTM, ...
+**Contributions of AI:** brainstorming, learning NN package for fitting LSTM, learning Prophet package.
