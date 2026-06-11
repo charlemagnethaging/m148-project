@@ -30,8 +30,8 @@ library(arrow)
 ```{r}
 #| label: read data
 
-dt <- read_parquet('data/dt_clean.parquet')
-user_outcomes <- read_parquet('data/user_outcomes.parquet')
+dt <- read_parquet('data/dt_clean1.parquet')
+user_outcomes <- read_parquet('data/user_outcomes1.parquet')
 ```
 
 ***Thomas Feedback:***
@@ -239,7 +239,68 @@ future_daily <- make_future_dataframe(m, periods = max(0, n_days), freq = "day")
 forecast_daily <- predict(m, future_daily)
 ```
 
-## fit orders-per-WEEK model
+### evaluate forecast accuracy 
+
+Compare forecast of model trained on dat_train1 to the new data in dat_train2
+
+```{r}
+#| label: evaluate accuracy
+
+# 1. Identify the end of the training period
+train_end_date <- max(daily_train_data$ds) # "2023-01-23"
+
+# 2. Read dt_clean2 and filter to the future period
+dt2 <- read_parquet('data/dt_clean2.parquet')
+test_period_dt <- dt2[as.IDate(event_timestamp) > train_end_date]
+
+# 3. Format test actuals (daily orders, dropping weekends)
+test_actuals <- test_period_dt[, .(
+  y_actual = sum(event_name == "order_shipped")
+), by = .(ds = as.IDate(event_timestamp))]
+
+# Drop weekends (warehouse closed)
+test_actuals_clean <- test_actuals[!(weekdays(ds) %in% c("Saturday", "Sunday"))]
+
+# 4. Merge test actuals with forecast (yhat)
+test_actuals_clean[, ds := as.Date(ds)]
+forecast_daily <- as.data.table(forecast_daily)
+forecast_daily[, ds := as.Date(ds)]
+
+eval_df <- merge(test_actuals_clean, forecast_daily[, .(ds, yhat)], by = "ds")
+
+# 5. Calculate out-of-sample accuracy metrics
+eval_df[, error := y_actual - yhat]
+eval_df[, pct_error := abs(error) / y_actual]
+
+rmse_val <- sqrt(mean(eval_df$error^2))
+mae_val <- mean(abs(eval_df$error))
+mape_val <- mean(eval_df$pct_error) * 100
+
+print(paste("Future Period (Out-of-sample) Metrics:"))
+print(paste("RMSE:", round(rmse_val, 2)))
+print(paste("MAE :", round(mae_val, 2)))
+print(paste("MAPE:", round(mape_val, 2), "%"))
+
+# 6. Visualize actuals vs forecast in the future window
+ggplot(eval_df, aes(x = ds)) +
+  geom_line(aes(y = y_actual, color = "Actual"), linewidth = 1) +
+  geom_line(aes(y = yhat, color = "Forecasted"), linetype = "dashed", linewidth = 1) +
+  scale_color_manual(values = c("Actual" = "black", "Forecasted" = "#0071b274")) +
+  labs(
+    title = "Out-of-Sample Evaluation: Actual vs. Forecasted Daily Orders",
+    subtitle = paste("Testing Window:", min(eval_df$ds), "to", max(eval_df$ds)),
+    x = "Date",
+    y = "Orders Shipped",
+    color = "Type"
+  ) +
+  theme_minimal()
+
+ggsave("charlie/prophet-plots/eval_actual_vs_forecast.png", width = 8, height = 4)
+```
+
+## Alternate models:
+
+### fit orders-per-WEEK model
 
 ```{r}
 #| label: prophet weekly model
@@ -265,7 +326,7 @@ future_weekly <- make_future_dataframe(m, periods = max(0, n_weeks), freq = "wee
 forecast_weekly <- predict(m, future_weekly)
 ```
 
-## fitting to orders-per-MONTH
+### fitting to orders-per-MONTH
 ```{r}
 #| label: fit prophet model to monthly data
 
@@ -304,7 +365,7 @@ forecast_monthly <- predict(m_monthly, future_monthly)
 
 ```
 
-## fitting to cohort method
+### fitting to cohort method
 
 ```{r}
 #| label: fit prophet model
@@ -359,7 +420,9 @@ wrap_plots(comp_plots, ncol=1)
 ggsave("charlie/prophet-plots/daily_components.png", width=8, height=6)
 ```
 
-## Weekly orders shipped
+## Alternate models:
+
+### Weekly orders shipped
 
 ```{r}
 #| label: plot weekly model
@@ -374,7 +437,7 @@ ggsave("charlie/prophet-plots/weekly_forecast.png", width=8, height=4)
 prophet_plot_components(m, forecast_weekly)
 ```
 
-## Monthly orders shipped 
+### Monthly orders shipped 
 
 ```{r}
 #| label: plot monthly model

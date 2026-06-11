@@ -125,14 +125,21 @@ combinations may not occur naturally.
 
 # Task 2: Forecasting Number of Orders Shipped
 
-– task description
-– modeling approach. Discussion of strengths and weaknesses of the model, possible improvements.
-– actual forecasts including a quantification of how good your forecasts
-are
-– at least 2 visualizations of your model, more is better
+For this forecasting task we had to predict the number of orders shipped per day, which is a time series forecasting problem. We used the Prophet package, which is designed for forecasting time series data that may have multiple seasonalities and holiday effects.
 
-- can reuse prophet plots
-- need to calculate accuracy by comparing forecast of model trained on dat_train1 to the new data in dat_train2
+To avoid an unnatural trend from the exclusion of ongoing journeys at the dataset's start-point, the first 71 days of observations were truncated based on the 80th percentile of complete journey lengths (71 days), and weekend entries were dropped to account for abnormally low shipping activity during warehouse closures.
+
+Using this cleaned daily data, we fit a Prophet time series model incorporating US national holidays, weekly seasonality, and yearly seasonality to project future daily order volumes. Below are some visualizations of the models' forecast (through Dec 2024) and its components.
+
+![Prophet forecast for daily orders shipped.](m148-project/charlie/prophet-plots/daily_forecast.png){width=80%}
+
+![Prophet components plot](m148-project/charlie/prophet-plots/daily_components.png){width=80%}
+
+The model's primary strength is its ability to elegantly capture overlapping seasonal cycles and holiday effects directly and showcase their unique impacts. Below is an accuracy evaluation plot of our model trained on the first training set (dat_train1) and evaluated on the second training set (dat_train2). The model's forecasted values do a decent job of tracking the actual daily orders shipped.
+
+![Prophet prediction vs. actual orders shipped for the evaluation period.](m148-project/charlie/prophet-plots/eval_actual_vs_forecast.png){width=80%}
+
+A key weakness that remains is our decision to drop weekends entirely rather than appending them to the adjacent weekday. Another limitation is not restricting the model's outcome to non-negative values, which could be addressed by log transforming orders shipped.
 
 # Sidequest: LSTM?
 
