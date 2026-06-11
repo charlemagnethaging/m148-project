@@ -141,10 +141,33 @@ The model's primary strength is its ability to elegantly capture overlapping sea
 
 A key weakness that remains is our decision to drop weekends entirely rather than appending them to the adjacent weekday. Another limitation is not restricting the model's outcome to non-negative values, which could be addressed by log transforming orders shipped.
 
-# Sidequest: LSTM?
+# Branching Out: LSTM Sequence Model
 
-- briefly discuss process and package used, pretty much just copy off slides
-*at least one more section on something you did in the ”branching out” category*
+Our primary tree-based models require each journey to be flattened into summary
+features such as event counts and average time gaps. Although effective, this
+representation loses the order of events and may hide meaningful patterns in
+the path a customer takes. We therefore fit a recurrent neural network with a
+long short-term memory (LSTM) layer to model journeys directly as ordered event
+sequences. Unlike Prophet, which captures aggregate calendar patterns, the LSTM
+can combine timing with event types and browsing frequency at the individual
+customer level.
+
+We implemented the model using the `keras3` package. Each journey was represented
+by its 100 most recent actions and the time gaps between them, with shorter
+journeys padded to a common length. The 27 distinct action types were passed
+through a 14-dimensional embedding layer, while time gaps were passed through a
+four-neuron dense layer. These representations were combined and supplied to an
+LSTM with 64 hidden units, which produced each journey's predicted probability
+of eventually reaching `order_shipped`.
+
+The LSTM achieved a Brier score of 0.0425, compared with approximately 0.035 for
+our tree-based models. Its main advantage is that it learns directly from
+sequential event data with little manual feature engineering and can capture
+patterns that flattened features omit. However, it required more processing
+time for training and prediction, was less interpretable, and did not outperform
+the simpler tree-based approach. These results suggest that event order contains
+useful information, but further architecture tuning or a larger training run
+would be needed for the sequence model to improve predictive accuracy.
 
 # Appendix
 
